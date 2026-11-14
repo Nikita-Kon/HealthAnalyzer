@@ -97,6 +97,62 @@ function lerp3(a: number[], b: number[], t: number): [number, number, number] {
 }
 const SPOT_LIST = (['brain', 'heart', 'muscles'] as Organ[]).flatMap((o) => SPOTS[o].map((s) => ({ organ: o, ...s })))
 
+// Arm bones were aligned offline with a single shoulder→fingertip rotation, but the skin arm bends forward at the
+// elbow — so the elbow poked ~6 cm out of the skin and the wrist sat ~4 cm low. Re-pose them as a 2-bone chain:
+// humerus → skin shoulder/elbow, forearm (stretched to length) + hand → skin elbow/wrist. Landmarks measured on body.glb (left side, mirrored).
+const BONE_ARM = { shoulder: [0.169, 1.33, 0.016], elbow: [0.308, 1.162, 0.074], wrist: [0.421, 1.024, 0.17] }
+const BONE_HAND_Q = [0.4411, -0.3255, 0.4679, 0.6932] as const // left hand, after the arm fit
+const BONE_HAND_SCALE = 0.85
+function fitArms(g: THREE.BufferGeometry) {
+  const pos = g.attributes.position as THREE.BufferAttribute
+  const v = new THREE.Vector3(), w = new THREE.Vector3(), tmp = new THREE.Vector3()
+  for (const side of [1, -1]) {
+    const m = (p: number[] | [number, number, number]) => new THREE.Vector3(p[0] * side, p[1], p[2])
+    const bS = m(BONE_ARM.shoulder), bE = m(BONE_ARM.elbow), bW = m(BONE_ARM.wrist)
+    const sS = m(J['l-shoulder']), sE = m(J['l-elbow']), sW = m(J['l-hand'])
+    // upper arm: rotate about the shoulder so the bone elbow lands on the skin elbow
+    const q1 = new THREE.Quaternion().setFromUnitVectors(bE.clone().sub(bS).normalize(), sE.clone().sub(sS).normalize())
+    const up = (p: THREE.Vector3) => p.sub(bS).applyQuaternion(q1).add(sS)
+    // forearm: hinge at the elbow toward the skin wrist, stretch the shaft to the skin forearm length
+    const e1 = up(bE.clone()), w1 = up(bW.clone())
+    const q2 = new THREE.Quaternion().setFromUnitVectors(w1.clone().sub(e1).normalize(), sW.clone().sub(sE).normalize())
+    const bLen = bW.distanceTo(bE), stretch = sE.distanceTo(sW) - bLen
+    const fAxis = bW.clone().sub(bE).normalize(), aAxis = bE.clone().sub(bS).normalize(), aLen = bE.distanceTo(bS)
+    const outAxis = sW.clone().sub(sE).normalize()
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+      if (v.x * side < 0.12 || v.y < 0.85 || v.y > 1.42) continue
+      const t = tmp.copy(v).sub(bS).dot(aAxis) // along the humerus
+      const r = tmp.copy(v).sub(bS).addScaledVector(aAxis, -t).length()
+      const f = tmp.copy(v).sub(bE).dot(fAxis) // along the forearm
+      const onArm = t > -0.01 && (f < 0 ? r < 0.06 : tmp.copy(v).sub(bE).addScaledVector(fAxis, -f).length() < (f > bLen ? 0.1 : 0.06))
+      if (!onArm) continue
+      const kS = THREE.MathUtils.smoothstep(t, -0.01, 0.03) // leave scapula / clavicle in place
+      const kF = THREE.MathUtils.smoothstep(t - aLen, -0.025, 0.02) // blend across the elbow joint
+      w.copy(v)
+      up(w)
+      const a = w.clone()
+      w.sub(sE).applyQuaternion(q2).add(sE).addScaledVector(outAxis, stretch * THREE.MathUtils.clamp(f / bLen, 0, 1))
+      a.lerp(w, kF)
+      v.lerp(a, kS)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    // hand: the bone hand is twisted ~90° about its own axis vs the skin hand (palms faced different ways) and a bit large.
+    // Rotate it about the skin wrist and shrink to sit inside the hand — fitted on body.glb by minimising bone vertices outside the skin.
+    const qh = new THREE.Quaternion(BONE_HAND_Q[0], BONE_HAND_Q[1] * side, BONE_HAND_Q[2] * side, BONE_HAND_Q[3]) // mirrored for the right hand
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+      if (v.x * side < 0.3 || v.y < 0.85 || v.y > 1.3) continue
+      const k = THREE.MathUtils.smoothstep(tmp.copy(v).sub(sW).dot(outAxis), -0.02, 0.02)
+      if (!k) continue
+      w.copy(v).sub(sW).applyQuaternion(qh).multiplyScalar(BONE_HAND_SCALE).add(sW)
+      v.lerp(w, k)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+  }
+  pos.needsUpdate = true
+}
+
 /** label anchor points */
 export const LABEL_AT: Record<Organ, [number, number, number]> = {
   brain: [0, O.brain[1] + 0.03, O.brain[2]],
@@ -140,6 +196,7 @@ function Body({ organs, selected, bpm, labels, interacting }: Props) {
       g.setAttribute('position', new THREE.BufferAttribute(arr, 3))
       if (m.geometry.index) g.setIndex(Array.from(m.geometry.index.array))
       g.applyMatrix4(m.matrixWorld)
+      if (m.name === 'skeleton') fitArms(g)
       g.computeVertexNormals()
       const mesh = new THREE.Mesh(g)
       mesh.name = m.name
