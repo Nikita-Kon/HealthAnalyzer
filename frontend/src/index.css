@@ -77,13 +77,12 @@
 input[type='range'].tl { appearance: none; background: transparent; height: 32px; cursor: pointer; width: 100%; }
 input[type='range'].tl::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
 input[type='range'].tl::-moz-range-track { height: 4px; background: transparent; }
-input[type='range'].tl::-webkit-slider-thumb {
-  appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
-  background: var(--color-ink); box-shadow: 0 0 0 5px oklch(0.86 0.1 210 / 0.22), 0 0 16px oklch(0.86 0.1 210 / 0.55);
-  transition: transform 0.4s var(--ease-soft);
-}
-input[type='range'].tl:active::-webkit-slider-thumb { transform: scale(1.15); }
-input[type='range'].tl::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--color-ink); }
+/* the visible thumb is the <Moon/> drawn over the input; the native thumb only keeps the hit area */
+input[type='range'].tl::-webkit-slider-thumb { appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%; background: transparent; }
+input[type='range'].tl::-moz-range-thumb { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; }
+.moon { transition: scale 0.5s var(--ease-soft), filter 0.5s var(--ease-soft); }
+.tl-wrap:hover .moon { scale: 1.12; filter: drop-shadow(0 0 10px oklch(0.92 0.06 210 / 0.75)); }
+.tl-wrap:active .moon { scale: 1.22; }
 
 .recharts-cartesian-axis-tick-value { font-family: var(--font-mono); font-size: 10.5px; fill: var(--color-ink-3); }
 .recharts-surface:focus, .recharts-wrapper:focus { outline: none; }
