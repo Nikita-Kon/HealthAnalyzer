@@ -1,4 +1,4 @@
-# HealthAnalyzer — frontend
+# AstroHealth — frontend (team Metamorphosis)
 
 React 19 + Vite 8 + TypeScript + Tailwind 4 + Recharts 3 + TanStack Query + motion + three / react-three-fiber.
 Implements spec §9.4: participant selection, dashboard of current metrics, history charts, Replay (Play / Pause / Restart / Speed / date),

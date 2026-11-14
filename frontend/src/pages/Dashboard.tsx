@@ -1,11 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { Activity, ServerCrash } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { ServerCrash } from 'lucide-react'
 import { api, USING_MOCK } from '@/api/client'
 import type { MetricId } from '@/api/types'
 import { useAnalytics, useAstronauts, useCrewAnalytics, useCrewMetric, useHistory, useSummary, useThrottled } from '@/hooks/useHealthData'
 import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart } from '@/hooks/useReplay'
 import { crewStatus, isAnomaly } from '@/lib/status'
+import { TEAM, crewMember } from '@/lib/crew'
+import { Brand } from '@/components/Brand'
 import { CrewRail, CrewStrip } from '@/components/Crew'
 import { BodyStage } from '@/components/body/BodyStage'
 import { Vitals } from '@/components/Vitals'
@@ -66,7 +69,7 @@ export default function Dashboard() {
   const rhr = useCrewMetric(ids, 'resting_heart_rate')
   const [metric, setMetric] = useState<MetricId>('resting_heart_rate')
 
-  const me = crew.find((c) => c.id === sel)
+  const me = sel ? crewMember(sel) : null
   const st = crewStatus(analytics)
   const nChanges = analytics?.findings.filter((f) => isAnomaly(f.status)).length ?? 0
   const pick = (m: MetricId) => {
@@ -92,15 +95,7 @@ export default function Dashboard() {
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-line bg-void/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1680px] items-center gap-4 px-4 py-3 sm:px-6 lg:gap-6">
-          <a href="#" className="flex shrink-0 items-center gap-2.5" aria-label="HealthAnalyzer">
-            <span className="relative grid size-9 place-items-center rounded-xl border border-line-2 bg-panel">
-              <Activity className="size-4.5 text-ice" aria-hidden />
-            </span>
-            <span className="leading-none">
-              <span className="block font-display text-[15px] font-semibold tracking-tight">HealthAnalyzer</span>
-              <span className="mt-1 hidden font-mono text-[9.5px] uppercase tracking-[0.18em] text-ink-3 sm:block">Autonomous crew health · Space Apps 2026</span>
-            </span>
-          </a>
+          <Brand />
           <div className="hidden min-w-0 flex-1 lg:block">
             <ReplayBar />
           </div>
@@ -117,7 +112,7 @@ export default function Dashboard() {
 
       <main className="mx-auto grid max-w-[1680px] grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-4 sm:px-6 lg:grid-cols-[256px_minmax(0,1fr)_330px] xl:grid-cols-[288px_minmax(0,1fr)_360px] lg:gap-5 lg:pt-5">
         {/* crew rail */}
-        <aside className="hidden lg:sticky lg:top-[84px] lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:flex lg:h-[calc(100dvh-104px)] lg:self-start">
+        <aside className="hidden lg:sticky lg:top-[84px] lg:col-start-1 lg:row-span-4 lg:row-start-1 lg:flex lg:h-[calc(100dvh-104px)] lg:self-start">
           <Card className="flex w-full flex-col p-2 pt-4">
             <CrewRail {...crewProps} />
           </Card>
@@ -127,14 +122,25 @@ export default function Dashboard() {
           <CrewStrip {...crewProps} />
         </div>
 
-        {/* stage */}
-        <Card className="overflow-hidden lg:col-start-2 lg:row-start-1">
-          <div className="relative z-10 flex items-start justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
+        {/* crew member */}
+        <Card delay={0.05} className="lg:col-start-2 lg:row-start-1">
+          <div className="flex items-start justify-between gap-3 px-5 py-5 sm:px-6">
             <div className="min-w-0">
               <Kicker>
-                {sel.toUpperCase()} · as of {asOfSel}
+                {me?.code ?? '—'} · {me?.role.label ?? ''} · as of {asOfSel}
               </Kicker>
-              <h1 className="mt-1.5 font-display text-[clamp(1.6rem,3.2vw,2.6rem)] font-medium leading-[1.05] tracking-tight">{me?.name ?? '—'}</h1>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.h1
+                  key={sel}
+                  initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-1.5 font-display text-[clamp(1.6rem,3.2vw,2.6rem)] font-medium leading-[1.05] tracking-tight"
+                >
+                  {me?.callsign ?? '—'}
+                </motion.h1>
+              </AnimatePresence>
               <p className="st mt-2 text-[13px] text-ink-2 sm:text-sm">
                 {st === 'unknown'
                   ? 'Collecting enough days for a personal baseline.'
@@ -145,12 +151,24 @@ export default function Dashboard() {
             </div>
             <StatusPill status={st} />
           </div>
-          <BodyStage analytics={analytics} bpm={summary?.metrics.resting_heart_rate?.value ?? null} />
+        </Card>
+
+        {/* vitals */}
+        <section className="lg:col-start-2 lg:row-start-2" aria-label="Current measurements">
+          <Vitals summary={summary} analytics={analytics} history={history.data} asOf={asOfSel} active={metric} onPick={pick} />
+        </section>
+
+        {/* history */}
+        <Card delay={0.12} className="scroll-mt-24 p-4 sm:p-6 lg:col-start-2 lg:row-start-3">
+          <div id="history" className="scroll-mt-28" />
+          <Suspense fallback={<div className="h-[320px]" />}>
+            <HistoryChart history={history.data} analytics={analytics} metric={metric} onMetric={setMetric} start={start} day={day} days={days} member={sel} />
+          </Suspense>
         </Card>
 
         {/* alerts */}
-        <aside className="lg:sticky lg:top-[84px] lg:col-start-3 lg:row-span-3 lg:row-start-1 lg:max-h-[calc(100dvh-104px)] lg:self-start lg:overflow-y-auto lg:no-scrollbar">
-          <Card className="p-4 sm:p-5">
+        <aside className="lg:sticky lg:top-[84px] lg:col-start-3 lg:row-span-4 lg:row-start-1 lg:max-h-[calc(100dvh-104px)] lg:self-start lg:overflow-y-auto lg:no-scrollbar">
+          <Card delay={0.08} className="p-4 sm:p-5">
             <div className="mb-4 flex items-end justify-between">
               <div>
                 <Kicker>Notifications</Kicker>
@@ -160,7 +178,7 @@ export default function Dashboard() {
             </div>
             <Notifications analytics={analytics} onPick={pick} />
           </Card>
-          <Card className="mt-4 hidden p-5 lg:block">
+          <Card delay={0.16} className="mt-4 hidden p-5 lg:block">
             <Kicker>How detection works</Kicker>
             <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-ink-2">
               <li><span className="text-ink">Personal baseline</span> — median of the previous 14 days, needs ≥ 7 valid observations.</li>
@@ -171,17 +189,16 @@ export default function Dashboard() {
           </Card>
         </aside>
 
-        {/* vitals */}
-        <section className="lg:col-start-2 lg:row-start-2" aria-label="Current measurements">
-          <Vitals summary={summary} analytics={analytics} history={history.data} asOf={asOfSel} active={metric} onPick={pick} />
-        </section>
-
-        {/* history */}
-        <Card className="scroll-mt-24 p-4 sm:p-6 lg:col-start-2 lg:row-start-3">
-          <div id="history" className="scroll-mt-28" />
-          <Suspense fallback={<div className="h-[320px]" />}>
-            <HistoryChart history={history.data} analytics={analytics} metric={metric} onMetric={setMetric} start={start} day={day} days={days} />
-          </Suspense>
+        {/* 3D body map */}
+        <Card delay={0.2} className="overflow-hidden lg:col-start-2 lg:row-start-4">
+          <div className="relative z-10 flex items-end justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
+            <div>
+              <Kicker>Body map · {me?.code ?? '—'}</Kicker>
+              <h2 className="mt-1 font-display text-lg font-medium">3D health scan</h2>
+            </div>
+            <StatusPill status={st} />
+          </div>
+          <BodyStage analytics={analytics} bpm={summary?.metrics.resting_heart_rate?.value ?? null} />
         </Card>
       </main>
 
@@ -189,6 +206,7 @@ export default function Dashboard() {
         <p>
           Participants are PMData volunteers on Earth, shown as demo crew members. Decision-support prototype, not a medical device. {USING_MOCK ? 'Running on mock data.' : 'Live API.'} Replay date {isoAt(start, day)}.
         </p>
+        <p className="mt-1">Built by team {TEAM} for the NASA Space Apps Challenge 2026.</p>
         <p className="mt-1">3D body: MakeHuman base mesh (CC0) · skeleton & organs from Z-Anatomy / BodyParts3D (CC BY-SA 4.0), adapted.</p>
       </footer>
     </div>
