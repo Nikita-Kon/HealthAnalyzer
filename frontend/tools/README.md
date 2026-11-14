@@ -7,7 +7,7 @@ The 3D body is built offline once; the app only ships the result (~350 KB).
 2. **Skeleton & organs** — Z-Anatomy / BodyParts3D (CC BY-SA 4.0) via the `authorOd/3d-anatomy-atlas` data package
    (`releases/1.2.0/economy`): cranium, vertebral column, thoracic skeleton, bones of upper/lower limb, brain,
    arterial system (heart), thoracic cavity (lungs), respiratory system (trachea only).
-3. `node compose.mjs body_raw.glb` aligns everything to the skin: uniform scale to height, chest-depth fit,
+3. `MODELS_DIR=./models node compose.mjs body_raw.glb` (expects `mh_base.glb`, `mh_joints.json` and `za/*.glb` there) aligns everything to the skin: uniform scale to height, chest-depth fit,
    head bbox fit, legs sheared to the A-pose stance, arms rotated in 3D around the shoulder. Writes `body_raw.anchors.json`.
 4. `node pack.mjs body_raw.glb body.glb 0.55` — weld, simplify, quantize, meshopt.
 

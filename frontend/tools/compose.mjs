@@ -6,7 +6,8 @@ import { dequantize, clearNodeTransform, weld } from '@gltf-transform/functions'
 import { MeshoptDecoder } from 'meshoptimizer'
 await MeshoptDecoder.ready
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder })
-const ZA = '/home/claude/models/za/', OUT = process.argv[2]
+const MODELS = (process.env.MODELS_DIR ?? './models').replace(/\/?$/, '/')
+const ZA = MODELS + 'za/', OUT = process.argv[2]
 
 async function load(file) {
   const d = await io.read(file)
@@ -28,10 +29,10 @@ const verts = (g, pred = () => true) => { const v = []; for (let i = 0; i < g.po
 const mean = (v) => v.reduce((a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], [0, 0, 0]).map((x) => x / Math.max(1, v.length))
 
 // ---- skin (MakeHuman, decimetres → metres, floor at 0)
-const skin = await load('/home/claude/models/mh_base.glb')
+const skin = await load(MODELS + 'mh_base.glb')
 const MH_FLOOR = Math.min(...verts(skin).map((v) => v[1]))
 each(skin, (x, y, z) => [x * 0.1, (y - MH_FLOOR) * 0.1, z * 0.1])
-const J = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync('/home/claude/models/mh_joints.json'))).map(([k, [x, y, z]]) => [k, [x * 0.1, (y - MH_FLOOR) * 0.1, z * 0.1]]))
+const J = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(MODELS + 'mh_joints.json'))).map(([k, [x, y, z]]) => [k, [x * 0.1, (y - MH_FLOOR) * 0.1, z * 0.1]]))
 const H = Math.max(...verts(skin).map((v) => v[1]))
 console.log('skin height', H.toFixed(3))
 
