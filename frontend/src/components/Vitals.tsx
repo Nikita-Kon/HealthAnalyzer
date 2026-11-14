@@ -1,3 +1,4 @@
+import { motion } from 'motion/react'
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from 'lucide-react'
 import type { Analytics, MetricId, Summary } from '@/api/types'
 import type { History } from '@/hooks/useHealthData'
@@ -11,19 +12,23 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
 export function Vitals({ summary, analytics, history, asOf, active, onPick }: { summary?: Summary; analytics?: Analytics; history: History; asOf: string; active: MetricId; onPick: (m: MetricId) => void }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {METRICS.map((m) => {
+      {METRICS.map((m, i) => {
         const s = summary?.metrics[m.id]
         const f = analytics?.findings.find((x) => x.metric === m.id)
         const st = metricStatus(analytics, m.id)
-        const age = s ? daysBetween(s.measured_at, asOf) : null
+        // age vs the date this summary was computed for — while the next day is loading the previous summary is shown, and must not read as "1d ago"
+        const age = s && summary ? daysBetween(s.measured_at, summary.as_of) : null
         const dev = f?.deviation_percent
         const Trend = f?.trend === 'increasing' ? ArrowUpRight : f?.trend === 'decreasing' ? ArrowDownRight : ArrowRight
         const flagged = st === 'watch' || st === 'alert'
         const spark = upTo(history[m.id], asOf).filter((x) => daysBetween(x.date, asOf) < 21)
         const isActive = active === m.id
         return (
-          <button
+          <motion.button
             key={m.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.1 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             onClick={() => onPick(m.id)}
             aria-pressed={isActive}
             className={`st group relative flex min-w-0 flex-col rounded-2xl border p-3 text-left sm:p-3.5 ${isActive ? 'border-line-2 bg-raise/70' : 'border-line bg-panel hover:border-line-2'}`}
@@ -57,7 +62,7 @@ export function Vitals({ summary, analytics, history, asOf, active, onPick }: { 
               <span className={`font-mono text-[9.5px] ${age && age > 0 ? 'text-watch/80' : 'text-ink-3'}`}>{s ? (age === 0 ? 'today' : `${age}d ago`) : ''}</span>
               <Sparkline values={spark.map((x) => x.value)} baseline={f?.baseline} color={flagged ? STATUS[st].color : 'var(--color-ice)'} width={64} height={20} domain={META[m.id].domain} />
             </span>
-          </button>
+          </motion.button>
         )
       })}
     </div>

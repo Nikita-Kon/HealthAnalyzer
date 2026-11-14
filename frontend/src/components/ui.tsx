@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { motion, useSpring, useTransform } from 'motion/react'
 import { STATUS, type Status } from '@/lib/status'
 
@@ -36,8 +36,18 @@ export function Kicker({ children, className }: { children: ReactNode; className
   return <p className={`font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-ink-3 ${className ?? ''}`}>{children}</p>
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={`glass relative min-w-0 rounded-3xl ${className ?? ''}`}>{children}</section>
+/** glass panel that eases in on first paint (staggered with `delay`) */
+export function Card({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 14, filter: 'blur(6px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ duration: 0.8, delay, ease: [0.22, 1, 0.36, 1] }}
+      className={`glass relative min-w-0 rounded-3xl ${className ?? ''}`}
+    >
+      {children}
+    </motion.section>
+  )
 }
 
 /** segmented control with a sliding pill */
@@ -59,8 +69,29 @@ export function Segmented<T extends string | number>({ value, onChange, options,
   )
 }
 
-/** Lightweight SVG sparkline (no chart lib — cheap enough for 16+ instances updating every replay tick) */
+const sameAs = (a: (number | null)[], b: (number | null)[]) => a.length === b.length && a.every((x, i) => x === b[i])
+
+/**
+ * Lightweight SVG sparkline (no chart lib — cheap enough for 16+ instances updating every replay tick).
+ * A new day slides the line left instead of snapping; a different series draws itself in.
+ */
 export function Sparkline({ values, color = 'var(--color-ice)', width = 72, height = 22, domain, baseline }: { values: (number | null)[]; color?: string; width?: number; height?: number; domain?: [number, number]; baseline?: number | null }) {
+  const fade = useId()
+  const sig = values.join(',')
+  const [anim, setAnim] = useState({ sig, prev: values, gen: 0, mode: 'draw' as 'draw' | 'slide' | 'none', k: 1, at: 0, dur: 0.6 })
+  if (anim.sig !== sig) {
+    const now = performance.now()
+    const p = anim.prev
+    // shifted by k new points (fast replay can add a few at once)
+    let k = 0
+    for (let n = 1; n <= 6 && !k; n++) if (p.length === values.length && values.length > n + 1 && sameAs(p.slice(n), values.slice(0, -n))) k = n
+    const grow = p.length < values.length && sameAs(p, values.slice(0, p.length))
+    const since = now - anim.at
+    // match the slide to the replay pace so fast playback glides instead of stuttering; never restart a draw mid-replay
+    const dur = Math.min(0.6, Math.max(0.12, (since / 1000) * 0.9))
+    setAnim({ sig, prev: values, gen: anim.gen + 1, mode: k ? 'slide' : grow || since < 800 ? 'none' : 'draw', k: k || 1, at: now, dur })
+  }
+
   const v = values.filter((x): x is number => x != null)
   if (v.length < 2) return <svg width={width} height={height} aria-hidden />
   const lo = domain?.[0] ?? Math.min(...v, baseline ?? Infinity)
@@ -79,11 +110,36 @@ export function Sparkline({ values, color = 'var(--color-ice)', width = 72, heig
     pen = true
   })
   const lastI = values.length - 1 - [...values].reverse().findIndex((x) => x != null)
+  const ease = [0.22, 1, 0.36, 1] as const
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible" aria-hidden>
-      {baseline != null && <line x1={0} x2={width} y1={y(baseline)} y2={y(baseline)} stroke="var(--color-ink-3)" strokeDasharray="2 3" strokeWidth={1} opacity={0.6} />}
-      <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="st" />
-      <circle cx={lastI * step} cy={y(values[lastI]!)} r={2.2} fill={color} />
+      <defs>
+        <linearGradient id={fade} x1="0" x2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity={0} />
+          <stop offset="0.18" stopColor="#fff" stopOpacity={1} />
+        </linearGradient>
+        <mask id={fade + 'm'} maskUnits="userSpaceOnUse" x={-4} y={-4} width={width + 8} height={height + 8}>
+          <rect x={-4} y={-4} width={width + 8} height={height + 8} fill={`url(#${fade})`} />
+        </mask>
+      </defs>
+      {baseline != null && <motion.line x1={0} x2={width} initial={false} animate={{ y1: y(baseline), y2: y(baseline) }} transition={{ duration: 0.6, ease }} stroke="var(--color-ink-3)" strokeDasharray="2 3" strokeWidth={1} opacity={0.6} />}
+      <g mask={`url(#${fade}m)`}>
+        <motion.g key={anim.gen} initial={anim.mode === 'slide' ? { x: step * anim.k } : false} animate={{ x: 0 }} transition={{ duration: anim.dur, ease: 'linear' }}>
+          <motion.path
+            d={d}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="st"
+            initial={anim.mode === 'draw' ? { pathLength: 0, opacity: 0 } : false}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 0.9, ease }}
+          />
+          <motion.circle cx={lastI * step} cy={y(values[lastI]!)} r={2.2} fill={color} initial={anim.mode === 'draw' ? { scale: 0, opacity: 0 } : false} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4, delay: anim.mode === 'draw' ? 0.6 : 0, ease }} />
+        </motion.g>
+      </g>
     </svg>
   )
 }
