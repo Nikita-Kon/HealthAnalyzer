@@ -11,7 +11,7 @@ Run from `backend`:
 ```
 
 The default source is `backend/app/data/pmdata`. The destination is configured
-by `app.database`: `../data/health.db` unless `DATABASE_URL` overrides it.
+by `app.database`: `backend/app/data/health.db` unless `DATABASE_URL` overrides it.
 Missing tables are created; existing tables are not dropped. `create_all` does
 not migrate an old DATE column to DATETIME. The database schema must match the
 current models. For the existing heart_rate_samples table, the importer adds a
