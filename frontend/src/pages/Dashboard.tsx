@@ -99,13 +99,13 @@ export default function Dashboard() {
     <div className="min-h-dvh pb-28 lg:pb-10">
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-line bg-void/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1680px] items-center gap-4 px-4 py-3 sm:px-6 lg:gap-6">
+        <div className="mx-auto flex max-w-[1680px] items-center gap-4 px-4 py-3 max-sm:flex-wrap max-sm:gap-y-2 sm:px-6 lg:gap-6">
           <Brand />
           <div className="hidden min-w-0 flex-1 lg:block">
             <ReplayBar />
           </div>
-          <div className="ml-auto lg:ml-0">
-            <div className="flex items-center gap-3"><LiveSimulationButton /><MissionDate /></div>
+          <div className="ml-auto max-sm:w-full lg:ml-0">
+            <div className="flex items-center gap-3 max-sm:justify-between"><LiveSimulationButton /><MissionDate /></div>
           </div>
         </div>
       </header>
