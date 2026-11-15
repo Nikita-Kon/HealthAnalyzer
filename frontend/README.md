@@ -8,8 +8,7 @@ notifications with explanations and "not enough data" states — plus a 3D body 
 ```bash
 cd frontend
 npm install            # .npmrc has legacy-peer-deps=true
-npm run dev            # http://localhost:5000 — mock data
-npm run dev:live       # http://localhost:5000 — real data from FastAPI on :8000 (start uvicorn first)
+npm run dev            # http://localhost:5173 — mock data by default
 ```
 
 ## Connect the backend
