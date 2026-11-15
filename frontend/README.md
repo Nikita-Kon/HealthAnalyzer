@@ -16,6 +16,18 @@ npm run dev            # http://localhost:5173 — mock data by default
 # frontend/.env
 VITE_API_URL=/api/v1   # Vite proxies /api → http://localhost:8000 (FastAPI)
 ```
+Against the deployed backend (it has no CORS, so go through the proxy):
+```bash
+API_PROXY=https://demo.nikitak.dev VITE_API_URL=/api/v1 npm run dev
+```
+
+## Deploy on the API domain
+`npm run build` produces `frontend/dist`, which talks to `/api/v1` on its own domain. FastAPI serves it at `/`
+automatically when `frontend/dist/index.html` exists (or set `FRONTEND_DIST`), so one uvicorn process serves both:
+```bash
+cd frontend && npm ci && npm run build
+cd ../backend && uvicorn app.main:app --host 0.0.0.0 --port 8000   # restart after each rebuild
+```
 Contract: spec §6 — `GET /astronauts`, `/astronauts/{id}`, `/metrics`, `/astronauts/{id}/measurements`,
 `/astronauts/{id}/summary?as_of=`, `/astronauts/{id}/analytics?as_of=`. Types: `src/api/types.ts`.
 `VITE_API_URL=mock` (default) uses `src/api/mock/*` — same JSON shapes; `mock/analytics.ts` is a TypeScript reference of
