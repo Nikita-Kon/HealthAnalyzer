@@ -16,6 +16,11 @@ npm run dev            # http://localhost:5173 — mock data by default
 # frontend/.env
 VITE_API_URL=/api/v1   # Vite proxies /api → http://localhost:8000 (FastAPI)
 ```
+When your domain forwards to port 5000, keep `VITE_API_URL=/api/v1`. The browser
+requests `/api/v1` on your domain; Vite forwards it locally to port 8000. Port 8000
+does not need to be exposed separately. Restart Vite after changing environment
+variables. Use `VITE_API_URL=mock` only for mock data.
+
 Against the deployed backend (it has no CORS, so go through the proxy):
 ```bash
 API_PROXY=https://demo.nikitak.dev VITE_API_URL=/api/v1 npm run dev
@@ -30,7 +35,7 @@ cd ../backend && uvicorn app.main:app --host 0.0.0.0 --port 8000   # restart aft
 ```
 Contract: spec §6 — `GET /astronauts`, `/astronauts/{id}`, `/metrics`, `/astronauts/{id}/measurements`,
 `/astronauts/{id}/summary?as_of=`, `/astronauts/{id}/analytics?as_of=`. Types: `src/api/types.ts`.
-`VITE_API_URL=mock` (default) uses `src/api/mock/*` — same JSON shapes; `mock/analytics.ts` is a TypeScript reference of
+`VITE_API_URL=mock` (optional; default only for single-file demos) uses `src/api/mock/*` — same JSON shapes; `mock/analytics.ts` is a TypeScript reference of
 spec §7 (median baseline over 14 days, ≥ 7 samples, median + MAD anomalies, combined rules, 7-day trend).
 
 ## How Replay works (spec §8)
