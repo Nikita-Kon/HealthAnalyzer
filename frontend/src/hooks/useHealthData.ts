@@ -46,6 +46,10 @@ export function useCrewMetric(ids: string[], metric: MetricId) {
   return useMemo(() => Object.fromEntries(ids.map((id, i) => [id, qs[i].data?.data ?? []])), [key]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/** Daily step history for the activity panel */
+export const useSteps = (id: string | null) =>
+  useQuery({ queryKey: ['history', id, 'steps'], queryFn: () => fetchHistory(id!, 'steps'), enabled: !!id, staleTime: Infinity })
+
 export const useAnalytics = (id: string | null, asOf: string) =>
   useQuery({ queryKey: ['analytics', id, asOf], queryFn: () => api.analytics(id!, asOf), enabled: !!id, placeholderData: keepPreviousData, staleTime: Infinity })
 

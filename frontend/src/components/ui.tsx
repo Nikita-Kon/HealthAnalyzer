@@ -3,9 +3,9 @@ import { motion, useSpring, useTransform } from 'motion/react'
 import { STATUS, type Status } from '@/lib/status'
 
 /** Number that glides to its new value instead of jumping */
-export function Ticker({ value, digits = 0, className }: { value: number | null | undefined; digits?: number; className?: string }) {
+export function Ticker({ value, digits = 0, group, className }: { value: number | null | undefined; digits?: number; group?: boolean; className?: string }) {
   const spring = useSpring(value ?? 0, { stiffness: 120, damping: 24, mass: 0.6 })
-  const text = useTransform(spring, (v) => v.toFixed(digits))
+  const text = useTransform(spring, (v) => (group ? v.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits }) : v.toFixed(digits)))
   useEffect(() => {
     if (value != null) spring.set(value)
   }, [value, spring])

@@ -1,6 +1,6 @@
 // Mock implementation of the /api/v1 contract — same JSON shapes as FastAPI.
-import type { Analytics, Astronaut, AstronautListItem, MeasurementPage, MetricId, MetricInfo, Summary } from '../types'
-import { DAYS, IDS, START, addDays, dayIndex, series } from './data'
+import type { ActivityId, Analytics, Astronaut, AstronautListItem, MeasurementPage, MetricId, MetricInfo, Summary } from '../types'
+import { DAYS, IDS, START, addDays, dayIndex, series, stepSeries } from './data'
 import { UNITS, analyze } from './analytics'
 
 const wait = <T,>(v: T, ms = 40) => new Promise<T>((r) => setTimeout(() => r(v), ms))
@@ -20,15 +20,15 @@ export const mockApi = {
     return wait({ id, name: name(id), source: 'pmdata', first_record_date: addDays(START, first), last_record_date: addDays(START, last) })
   },
   metrics: () => wait<{ data: MetricInfo[] }>({ data: (Object.keys(UNITS) as MetricId[]).map((metric) => ({ metric, unit: UNITS[metric] })) }),
-  measurements: (id: string, metric: MetricId, from?: string, to?: string, limit = 1000, offset = 0): Promise<MeasurementPage> => {
+  measurements: (id: string, metric: MetricId | ActivityId, from?: string, to?: string, limit = 1000, offset = 0): Promise<MeasurementPage> => {
     if (!IDS.includes(id)) return notFound('participant')
-    const v = series(id)[metric]
+    const v = metric === 'steps' ? stepSeries(id) : series(id)[metric]
     if (!v) return notFound('metric')
     const a = from ? Math.max(0, dayIndex(from)) : 0
     const b = to ? Math.min(DAYS - 1, dayIndex(to)) : DAYS - 1
     const all = []
     for (let i = a; i <= b; i++) if (v[i] != null) all.push({ date: addDays(START, i), value: v[i]! })
-    return wait({ participant_id: id, metric, unit: UNITS[metric], data: all.slice(offset, offset + Math.min(limit, 1000)), total: all.length, limit, offset })
+    return wait({ participant_id: id, metric, unit: metric === 'steps' ? 'steps' : UNITS[metric], data: all.slice(offset, offset + Math.min(limit, 1000)), total: all.length, limit, offset })
   },
   summary: (id: string, asOf: string): Promise<Summary> => {
     const s = series(id), d = dayIndex(asOf)

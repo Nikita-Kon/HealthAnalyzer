@@ -11,6 +11,9 @@ export type MetricId =
   | 'exercise_duration'
   | 'readiness'
 
+/** Fitbit activity served by GET /measurements too — shown, not analysed */
+export type ActivityId = 'steps'
+
 /** GET /astronauts → { data: AstronautListItem[] } */
 export interface AstronautListItem {
   id: string // "p01"
@@ -34,7 +37,7 @@ export interface MetricInfo {
 /** GET /astronauts/{id}/measurements?metric=&from_date=&to_date=&limit=&offset= */
 export interface MeasurementPage {
   participant_id: string
-  metric: MetricId
+  metric: MetricId | ActivityId
   unit: string
   data: { date: string; value: number }[]
   total: number

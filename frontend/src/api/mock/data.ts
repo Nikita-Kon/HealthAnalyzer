@@ -26,6 +26,7 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 
 export type Series = Record<MetricId, (number | null)[]>
 const cache = new Map<string, Series>()
+const stepCache = new Map<string, (number | null)[]>()
 
 export function series(id: string): Series {
   const hit = cache.get(id)
@@ -47,6 +48,7 @@ export function series(id: string): Series {
   const strain = (d: number) => eps.some(([a, b]) => d >= a && d <= b)
   const iso = (d: number) => Math.exp(-(((d - 100) / 20) ** 2)) * (0.5 + r() * 0.2) // mid-mission dip
 
+  const steps: (number | null)[] = []
   const out: Series = { resting_heart_rate: [], sleep_duration: [], sleep_score: [], stress: [], mood: [], fatigue: [], exercise_duration: [], readiness: [] }
   for (let d = 0; d < DAYS; d++) {
     const ep = strain(d)
@@ -64,7 +66,14 @@ export function series(id: string): Series {
     out.fatigue.push(w(2.3, (ep ? 2 : 0) + is * 1.1))
     out.readiness.push(asked ? Math.round(clamp(7.2 + n(1.4) - (ep ? 3.5 : 0) - is * 2, 0, 10)) : null)
     out.exercise_duration.push(trained ? Math.round(clamp(30 + 40 * fit + n(25), 10, 150)) : null)
+    steps.push(worn ? Math.round(clamp(5200 + 4200 * fit + n(1800) + (trained ? 3500 : 0) - (ep ? 3800 : 0) - is * 2600, 900, 24000)) : null)
   }
+  stepCache.set(id, steps)
   cache.set(id, out)
   return out
+}
+
+export function stepSeries(id: string) {
+  series(id)
+  return stepCache.get(id)!
 }

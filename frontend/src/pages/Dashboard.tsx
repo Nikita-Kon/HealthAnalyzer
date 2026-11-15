@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ServerCrash } from 'lucide-react'
 import { api, USING_MOCK } from '@/api/client'
 import type { MetricId } from '@/api/types'
-import { useAnalytics, useAstronauts, useCrewAnalytics, useCrewMetric, useHistory, useSummary, useThrottled } from '@/hooks/useHealthData'
+import { useAnalytics, useAstronauts, useCrewAnalytics, useCrewMetric, useHistory, useSteps, useSummary, useThrottled } from '@/hooks/useHealthData'
 import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart } from '@/hooks/useReplay'
 import { crewStatus, isAnomaly } from '@/lib/status'
 import { TEAM, crewMember } from '@/lib/crew'
@@ -12,6 +12,7 @@ import { Brand } from '@/components/Brand'
 import { CrewRail, CrewStrip } from '@/components/Crew'
 import { BodyStage } from '@/components/body/BodyStage'
 import { Vitals } from '@/components/Vitals'
+import { Activity } from '@/components/Activity'
 import { Notifications } from '@/components/Notifications'
 import { MissionDate, ReplayBar } from '@/components/Replay'
 import { Card, Kicker, StatusPill } from '@/components/ui'
@@ -65,6 +66,7 @@ export default function Dashboard() {
   const history = useHistory(sel || null)
   const analytics = useAnalytics(sel || null, asOfSel).data
   const summary = useSummary(sel || null, asOfSel).data
+  const steps = useSteps(sel || null).data
   const crewA = useCrewAnalytics(ids, asOfCrew)
   const rhr = useCrewMetric(ids, 'resting_heart_rate')
   const [metric, setMetric] = useState<MetricId>('resting_heart_rate')
@@ -124,11 +126,14 @@ export default function Dashboard() {
 
         {/* crew member */}
         <Card delay={0.05} className="lg:col-start-2 lg:row-start-1">
-          <div className="flex items-start justify-between gap-3 px-5 py-5 sm:px-6">
-            <div className="min-w-0">
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-5 py-5 sm:flex-nowrap sm:px-6">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
               <Kicker>
                 {me?.code ?? '—'} · {me?.role.label ?? ''} · as of {asOfSel}
               </Kicker>
+                <span className="sm:hidden"><StatusPill status={st} /></span>
+              </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.h1
                   key={sel}
@@ -149,7 +154,9 @@ export default function Dashboard() {
                     : `${nChanges} statistical change${nChanges === 1 ? '' : 's'}${analytics?.combined_findings.length ? `, ${analytics.combined_findings.length} combined` : ''} against the personal baseline.`}
               </p>
             </div>
-            <StatusPill status={st} />
+            <div className="hidden h-[104px] w-px shrink-0 self-center bg-line sm:block" />
+            <Activity data={steps?.data} asOf={asOfSel} />
+            <span className="hidden shrink-0 sm:block"><StatusPill status={st} /></span>
           </div>
         </Card>
 

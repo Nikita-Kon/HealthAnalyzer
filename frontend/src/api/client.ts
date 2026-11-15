@@ -1,6 +1,6 @@
 // API client for the HealthAnalyzer backend (FastAPI, /api/v1) with a drop-in mock.
 // VITE_API_URL: "mock" (default) → built-in mock; "/api/v1" → backend through the Vite dev proxy; or a full URL.
-import type { Analytics, Astronaut, AstronautListItem, MeasurementPage, MetricId, MetricInfo, Summary } from './types'
+import type { ActivityId, Analytics, Astronaut, AstronautListItem, MeasurementPage, MetricId, MetricInfo, Summary } from './types'
 import { mockApi } from './mock'
 
 const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? 'mock').replace(/\/$/, '')
@@ -40,14 +40,14 @@ export const api = USING_MOCK
       astronauts: () => get<{ data: AstronautListItem[] }>('/astronauts'),
       astronaut: (id: string) => get<Astronaut>(`/astronauts/${id}`),
       metrics: async () => ({ data: unwrap(await get<MetricInfo[] | { data: MetricInfo[] }>('/metrics')) }),
-      measurements: (id: string, metric: MetricId, from?: string, to?: string, limit = 1000, offset = 0) =>
+      measurements: (id: string, metric: MetricId | ActivityId, from?: string, to?: string, limit = 1000, offset = 0) =>
         get<MeasurementPage>(`/astronauts/${id}/measurements`, { metric, from_date: from, to_date: to, limit, offset }),
       summary: (id: string, asOf: string) => get<Summary>(`/astronauts/${id}/summary`, { as_of: asOf }),
       analytics: (id: string, asOf: string) => get<Analytics>(`/astronauts/${id}/analytics`, { as_of: asOf }),
     }
 
 /** Fetch a whole metric history (paginates past the 1000-row limit) */
-export async function fetchHistory(id: string, metric: MetricId, from?: string, to?: string) {
+export async function fetchHistory(id: string, metric: MetricId | ActivityId, from?: string, to?: string) {
   const out: MeasurementPage['data'] = []
   let offset = 0
   for (;;) {
