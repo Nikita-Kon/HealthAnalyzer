@@ -161,7 +161,7 @@ export const LABEL_AT: Record<Organ, [number, number, number]> = {
   muscles: lerp3(J['l-upper-leg'], J['l-knee'], 0.45),
 }
 
-type Props = { organs: OrganState[]; selected: Organ | null; bpm: number; labels: React.RefObject<Map<Organ, HTMLElement>>; interacting: React.RefObject<boolean> }
+type Props = { organs: OrganState[]; selected: Organ | null; bpm: number | null; labels: React.RefObject<Map<Organ, HTMLElement>>; interacting: React.RefObject<boolean> }
 
 function Body({ organs, selected, bpm, labels, interacting }: Props) {
   const gltf = useGLTF(bodyUrl, false, true)
@@ -268,8 +268,8 @@ function Body({ organs, selected, bpm, labels, interacting }: Props) {
       u.uFill.value = (o === 'lungs' ? 0.02 : o === 'brain' ? 0.03 : 0.05) + st.k * (o === 'brain' ? 0.14 : 0.32)
       u.uRim.value = (o === 'brain' ? 0.45 : 0.7) + st.k * 0.9
     }
-    // heart beats at the measured resting HR, lungs breathe
-    const beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * (bpm / 60))), 10)
+    // Heart follows the selected recorded BPM; no beat is invented during gaps.
+    const beat = bpm == null ? 0 : Math.pow(Math.max(0, Math.sin(t * 2 * Math.PI * (bpm / 60))), 10)
     parts.heart?.scale.setScalar(1 + beat * 0.09)
     const br = 1 + Math.sin(t * 1.3) * 0.025
     parts.lungs?.scale.set(br, 1 + (br - 1) * 0.6, br)

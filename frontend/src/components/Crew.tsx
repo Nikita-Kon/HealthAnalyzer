@@ -2,23 +2,15 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Search, X } from 'lucide-react'
 import type { Analytics, AstronautListItem } from '@/api/types'
-import { upTo } from '@/hooks/useHealthData'
 import { crewMember, matchCrew } from '@/lib/crew'
 import { STATUS, crewStatus, isAnomaly } from '@/lib/status'
-import { Kicker, Sparkline, StatusDot } from './ui'
+import { Kicker, StatusDot } from './ui'
 
 type Props = {
   crew: AstronautListItem[]
   analytics: Record<string, Analytics | undefined>
-  rhr: Record<string, { date: string; value: number }[]>
-  asOf: string
   selected: string
   onSelect: (id: string) => void
-}
-
-function last(rows: { date: string; value: number }[], asOf: string, n: number) {
-  const r = upTo(rows, asOf)
-  return r.slice(-n).map((x) => x.value)
 }
 
 function CrewSearch({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
@@ -54,7 +46,7 @@ function CrewSearch({ value, onChange, className }: { value: string; onChange: (
 }
 
 /** desktop: vertical rail, fixed order (no reshuffling when someone's status changes) */
-export function CrewRail({ crew, analytics, rhr, asOf, selected, onSelect }: Props) {
+export function CrewRail({ crew, analytics, selected, onSelect }: Props) {
   const [q, setQ] = useState('')
   const attention = crew.filter((c) => ['watch', 'alert'].includes(crewStatus(analytics[c.id]))).length
   const shown = crew.filter((c) => matchCrew(c, q))
@@ -63,9 +55,9 @@ export function CrewRail({ crew, analytics, rhr, asOf, selected, onSelect }: Pro
       <div className="flex items-end justify-between px-3 pb-3">
         <div>
           <Kicker>Crew roster</Kicker>
-          <h2 className="mt-1 font-display text-lg font-medium">{crew.length} members</h2>
+          <h2 className="mt-1 whitespace-nowrap font-display text-base font-medium">{crew.length} members</h2>
         </div>
-        <p className="st pb-0.5 text-right text-xs text-ink-3">
+        <p className="st max-w-[72px] pb-0.5 text-right text-[10px] text-ink-3">
           <span className="font-display text-base font-medium tabular" style={{ color: attention ? 'var(--color-watch)' : 'var(--color-ink-2)' }}>
             {attention}
           </span>{' '}
@@ -97,7 +89,6 @@ export function CrewRail({ crew, analytics, rhr, asOf, selected, onSelect }: Pro
                         {!a ? 'syncing…' : st === 'unknown' ? 'not enough data' : n ? `${n} change${n > 1 ? 's' : ''}${a?.combined_findings.length ? ' · combined' : ''}` : 'within baseline'}
                       </span>
                     </span>
-                    <Sparkline values={last(rhr[c.id] ?? [], asOf, 21)} color={st === 'nominal' || st === 'unknown' ? 'var(--color-ink-3)' : STATUS[st].color} width={58} height={20} />
                   </span>
                 </button>
               </motion.li>

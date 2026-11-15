@@ -58,3 +58,17 @@ export async function fetchHistory(id: string, metric: MetricId | ActivityId, fr
     if (!p.data.length || offset >= p.total) return { unit: p.unit, data: out }
   }
 }
+
+export interface HeartRateSample { recorded_at: string; bpm: number; confidence: number | null }
+export async function fetchHeartRateDay(id: string, date: string, signal: AbortSignal): Promise<HeartRateSample[]> {
+  if (USING_MOCK) return []
+  const out: HeartRateSample[] = []
+  for (let offset = 0; ; offset += 10000) {
+    const params = new URLSearchParams({ start: `${date}T00:00:00`, end: `${date}T23:59:59.999999`, limit: '10000', offset: String(offset) })
+    const res = await fetch(`${BASE}/astronauts/${encodeURIComponent(id)}/heart-rate?${params}`, { signal, headers: { Accept: 'application/json' } })
+    if (!res.ok) throw new ApiError(res.status, 'Unable to load heart-rate samples')
+    const page = await res.json() as HeartRateSample[]
+    out.push(...page)
+    if (page.length < 10000) return out
+  }
+}

@@ -38,10 +38,15 @@ Contract: spec §6 — `GET /astronauts`, `/astronauts/{id}`, `/metrics`, `/astr
 `VITE_API_URL=mock` (optional; default only for single-file demos) uses `src/api/mock/*` — same JSON shapes; `mock/analytics.ts` is a TypeScript reference of
 spec §7 (median baseline over 14 days, ≥ 7 samples, median + MAD anomalies, combined rules, 7-day trend).
 
-## How Replay works (spec §8)
-- `src/hooks/useReplay.ts` — virtual date on `requestAnimationFrame`; components subscribe to the day or the scrubber position only.
-- Each metric history is fetched once; anything after the replay date is cut off before rendering (`upTo`).
-- Summary + analytics are requested with `as_of` = replay date (throttled at high speeds so the API isn't flooded).
+## Heart-rate replay
+- Previous/next buttons select the day. Playback never advances the date.
+- Play/pause, restart, a seconds slider and an exact time input control the selected day's recorded heart rate.
+- Speeds are 1x (one recorded second per real second), 60x, 600x and 3600x.
+- Samples are fetched from `/astronauts/{id}/heart-rate` for that day, paginated in batches of 10,000 and cached by participant/date. Requests are cancelled when their query becomes inactive.
+- Current BPM and the 3D heartbeat use the last sample at or before the selected second. Confidence 0 samples are excluded. A gap over 60 seconds shows no current value and stops the heart animation. Null confidence is displayed as unknown.
+- The intraday chart shows the preceding 15 minutes and does not draw future samples or bridge gaps over 60 seconds. Playback stops at the last available sample.
+- Daily resting HR, daily history and baseline analysis remain separate and use the selected calendar date. They include the day's observations, so they are not intraday as-of-time analysis.
+- Play is disabled when the selected participant/day has no usable samples, during loading, or in mock mode (which has no recorded heart-rate samples).
 
 ## Structure
 ```

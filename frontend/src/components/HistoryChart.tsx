@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, animate, motion, useMotionValue, type MotionValue } from 'motion/react'
-import { Area, AreaChart, CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Analytics, MetricId } from '@/api/types'
 import type { History } from '@/hooks/useHealthData'
 import { isoAt } from '@/hooks/useReplay'
+import { estimateGaps } from '@/lib/estimateGaps'
 import { METRICS, META, fmt } from '@/lib/metrics'
 import { STATUS, metricStatus } from '@/lib/status'
 import { Kicker, Segmented } from './ui'
@@ -64,9 +65,9 @@ function useFrame<K extends string>(mvs: Record<K, MotionValue<number>>) {
   return frame
 }
 
-type Row = { d: number; v: number | null; iso?: boolean }
+type Row = { d: number; v: number | null; estimate?: number | null; iso?: boolean }
 
-export function HistoryChart({ history, analytics, metric, onMetric, start, day, days, member }: { history: History; analytics?: Analytics; metric: MetricId; onMetric: (m: MetricId) => void; start: string; day: number; days: number; member: string }) {
+export function HistoryChart({ history, analytics, metric, onMetric, start, day, days, member, loading = false, error }: { loading?: boolean; error?: Error | null; history: History; analytics?: Analytics; metric: MetricId; onMetric: (m: MetricId) => void; start: string; day: number; days: number; member: string }) {
   const [win, setWin] = useState<number>(90)
   const meta = META[metric]
   const f = analytics?.findings.find((x) => x.metric === metric)
@@ -82,12 +83,15 @@ export function HistoryChart({ history, analytics, metric, onMetric, start, day,
   const series = useMemo(() => {
     const byDate = new Map((history[metric] ?? []).map((r) => [r.date, r.value]))
     const out: (number | null)[] = []
-    for (let i = 0; i <= day; i++) out.push(byDate.get(isoAt(start, i)) ?? null)
+    for (let i = 0; i <= day; i++) out.push(Number.isFinite(byDate.get(isoAt(start, i))) ? byDate.get(isoAt(start, i))! : null)
     return out
   }, [history, metric, day, start])
 
+  const estimates = useMemo(() => estimateGaps(series, meta.domain), [series, meta.domain])
+  const estimateColor = 'var(--color-ink-3)'
+
   // target y-domain from what's visible
-  const vals = series.slice(Math.max(0, day - winDays + 1)).filter((v): v is number => v != null)
+  const vals = series.map((value, i) => value ?? estimates[i]).slice(Math.max(0, day - winDays + 1)).filter((v): v is number => v != null)
   const lo0 = meta.domain?.[0] ?? (vals.length ? Math.min(...vals, f?.baseline ?? Infinity) : 0)
   const hi0 = meta.domain?.[1] ?? (vals.length ? Math.max(...vals, f?.baseline ?? -Infinity) : 1)
   const sp = Math.max(hi0 - lo0, MIN_SPAN[metric] ?? 0)
@@ -140,16 +144,24 @@ export function HistoryChart({ history, analytics, metric, onMetric, start, day,
   const rows = useMemo(() => {
     const out: Row[] = []
     const i0 = Math.max(0, Math.floor(L) - 1), i1 = Math.min(series.length - 1, Math.floor(p))
-    for (let i = i0; i <= i1; i++) out.push({ d: i, v: series[i], iso: series[i] != null && series[i - 1] == null && series[i + 1] == null })
+    for (let i = i0; i <= i1; i++) out.push({ d: i, v: series[i], estimate: estimates[i], iso: series[i] != null && series[i - 1] == null && series[i + 1] == null })
     const a = series[Math.floor(p)], b = series[Math.floor(p) + 1], t = p - Math.floor(p)
     if (t > 0.01 && a != null && b != null) out.push({ d: p, v: a + (b - a) * t })
     return out
-  }, [series, L, p])
+  }, [series, estimates, L, p])
 
   const yTicks = useMemo(() => niceTicks(fr.yLo, fr.yHi, 5), [fr.yLo, fr.yHi])
   const stepD = [1, 2, 7, 14, 30].find((s) => s / (R - L) >= 0.1) ?? 30
   const xTicks: number[] = []
-  for (let d = Math.ceil(L / stepD) * stepD; d <= R; d += stepD) xTicks.push(d)
+  for (let d = Math.ceil(L); d <= Math.min(R, days - 1); d++) xTicks.push(d)
+  const gaps: { from: number; to: number }[] = []
+  for (let d = Math.max(0, Math.ceil(L)); d <= Math.min(day, Math.floor(R)); d++) {
+    if (series[d] != null) continue
+    const previous = gaps.at(-1)
+    if (previous && previous.to === d - 1) previous.to = d
+    else gaps.push({ from: d, to: d })
+  }
+  const missing = gaps.reduce((n, gap) => n + gap.to - gap.from + 1, 0)
   const showBase = !Number.isNaN(fr.base) && fr.base >= fr.yLo && fr.base <= fr.yHi
 
   return (
@@ -182,53 +194,67 @@ export function HistoryChart({ history, analytics, metric, onMetric, start, day,
           )
         })}
       </div>
-      <div className="mt-4 h-[220px] sm:h-[260px]">
+      <div className="relative mt-4 h-[220px] sm:h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={rows} margin={{ top: 10, right: 16, left: -18, bottom: 0 }}>
-            <defs>
-              <linearGradient id="hist" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.32} className="st" />
-                <stop offset="100%" stopColor={color} stopOpacity={0} className="st" />
-              </linearGradient>
-            </defs>
+          <LineChart data={rows} margin={{ top: 10, right: 16, left: -18, bottom: 0 }}>
             <CartesianGrid stroke="oklch(1 0 0 / 0.06)" vertical={false} strokeDasharray="3 6" />
             {R > p + 0.5 && <ReferenceArea x1={p} x2={R} fill="oklch(1 0 0 / 0.025)" ifOverflow="hidden" label={R - p > span * 0.1 ? { value: 'FUTURE · HIDDEN', position: 'insideTop', fill: 'var(--color-ink-3)', fontSize: 9 } : undefined} />}
-            <XAxis dataKey="d" type="number" domain={[L, R]} allowDataOverflow ticks={xTicks} interval={0} tickLine={false} axisLine={false} tickFormatter={(i) => isoAt(start, i).slice(5).replace('-', '.')} />
+            {!loading && !error && gaps.map(gap => (
+              <ReferenceArea key={gap.from} x1={Math.max(L, gap.from - 0.4)} x2={Math.min(R, gap.to + 0.4)}
+                fill="var(--color-ink-3)" fillOpacity={0.08} ifOverflow="hidden" />
+            ))}
+            <XAxis dataKey="d" type="number" domain={[L, R]} allowDataOverflow ticks={xTicks} interval={0}
+              tickLine={{ stroke: 'var(--color-ink-3)', strokeOpacity: 0.45 }} axisLine={false}
+              tick={({ x, y, payload }) => (
+                <text x={x} y={Number(y ?? 0) + 12} textAnchor="middle" fill="var(--color-ink-3)" fontSize={10}>
+                  {payload && payload.value % stepD === 0 ? isoAt(start, payload.value).slice(5).replace('-', '.') : ''}
+                </text>
+              )} />
             <YAxis domain={[fr.yLo, fr.yHi]} allowDataOverflow ticks={yTicks} interval={0} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => (Math.abs(v) >= 10 || Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1))} />
             {showBase && <ReferenceLine y={fr.base} stroke="var(--color-ink-3)" strokeDasharray="5 5" label={{ value: `baseline ${fmt(metric, fr.base)}`, position: 'insideTopRight', fill: 'var(--color-ink-3)', fontSize: 10 }} />}
             <ReferenceLine x={p} stroke="var(--color-ice)" strokeOpacity={0.6} ifOverflow="hidden" />
             <Tooltip
+              filterNull={false}
               cursor={{ stroke: 'var(--color-ink-3)', strokeDasharray: '3 3' }}
               isAnimationActive={false}
               content={({ active, payload }) => {
-                const r = payload?.[0]?.payload as Row | undefined
+                const r = payload?.find(item => item.payload)?.payload as Row | undefined
                 if (!active || !r || !Number.isInteger(r.d)) return null
                 return (
                   <div className="rounded-xl border border-line-2 bg-panel-solid/95 px-3 py-2 text-xs shadow-2xl">
                     <p className="font-mono text-[10px] text-ink-3">{isoAt(start, r.d)}</p>
-                    <p className="mt-0.5 font-mono text-ink tabular">{r.v == null ? 'no measurement' : `${fmt(metric, r.v)} ${meta.unit}`}</p>
+                    <p className="mt-0.5 font-mono text-ink tabular">{r.v != null ? `${fmt(metric, r.v)} ${meta.unit} · measured` : r.estimate != null ? `${fmt(metric, r.estimate)} ${meta.unit} · estimated from prior trend` : 'no measurement'}</p>
                   </div>
                 )
               }}
             />
-            <Area
+            <Line dataKey="estimate" name="Estimated trend" type="linear" stroke={estimateColor}
+              strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={false}
+              connectNulls={false} isAnimationActive={false} />
+            <Line
               type="monotoneX"
               dataKey="v"
               stroke={color}
               strokeWidth={2}
-              fill="url(#hist)"
-              fillOpacity={fr.reveal}
-              baseValue={fr.yLo}
               connectNulls={false}
               isAnimationActive={false}
-              // days with no neighbours would be invisible in an area chart — show them as dots
-              dot={(props: { cx?: number; cy?: number; payload?: Row; index?: number }) => (props.payload?.iso && props.cx != null && props.cy != null ? <circle key={props.index} cx={props.cx} cy={props.cy} r={2} fill={color} /> : <g key={props.index} />)}
+              // Mark every measured calendar day; null days never become zeroes.
+              dot={(props: { cx?: number; cy?: number; payload?: Row; index?: number }) => (props.payload?.v != null && Number.isInteger(props.payload.d) && props.cx != null && props.cy != null ? <circle key={props.index} cx={props.cx} cy={props.cy} r={2.5} fill={color} /> : <g key={props.index} />)}
               activeDot={{ r: 4, stroke: 'var(--color-panel-solid)', strokeWidth: 2 }}
               style={{ filter: `drop-shadow(0 0 6px color-mix(in oklab, ${color} 45%, transparent))` }}
             />
-          </AreaChart>
+          </LineChart>
         </ResponsiveContainer>
+        {(loading || error || !vals.length) && (
+          <div role={error ? 'alert' : 'status'} className="absolute inset-0 grid place-items-center rounded-xl bg-panel-solid/90 px-6 text-center text-sm text-ink-3">
+            {loading ? 'Loading daily history…' : error ? 'History could not be loaded. Please try again.' : 'No measurements for this period.'}
+          </div>
+        )}
       </div>
+      <p className="mt-3 text-xs text-ink-3">
+        Dots and solid lines are measured. Muted dashed lines continue the prior trend across missing days (visual estimates only).
+        {!loading && !error && missing > 0 ? ` ${missing} missing day${missing === 1 ? '' : 's'} in view.` : ''}
+      </p>
     </div>
   )
 }
