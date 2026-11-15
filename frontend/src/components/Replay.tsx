@@ -1,14 +1,18 @@
 import { Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
-import { SPEEDS, isoAt, replay, useDay, usePlaying, usePos, useReplayRange, useSpeed, useStart } from '@/hooks/useReplay'
-import { useId } from 'react'
+import { SPEEDS, isoAt, replay, useDay, usePlaying,  useSpeed, useStart, useSeconds, useTimeReady, clock, useLive, useTotalDays } from '@/hooks/useReplay'
+import { startSimulation, stopSimulation } from '@/api/client'
+import { DatePicker } from './DatePicker'
+import { useId, useState } from 'react'
 import { Segmented } from './ui'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function PlayButton({ big }: { big?: boolean }) {
   const playing = usePlaying()
+  const ready = useTimeReady()
   return (
     <button
+      disabled={!ready}
       onClick={replay.toggle}
       aria-label={playing ? 'Pause replay' : 'Play replay'}
       className={`group relative grid shrink-0 place-items-center rounded-full bg-ice text-void shadow-[0_0_28px_oklch(0.86_0.1_210/0.45)] transition-transform duration-500 ease-soft hover:scale-[1.04] active:scale-95 ${big ? 'size-12' : 'size-11'}`}
@@ -82,44 +86,20 @@ export function Moon({ phase, size = THUMB }: { phase: number; size?: number }) 
 }
 
 export function Timeline() {
-  const pos = usePos()
-  const days = useReplayRange()
-  const start = useStart()
-  const p = days > 1 ? (pos / (days - 1)) * 100 : 0
-  const phase = moonPhase(Date.parse(start + 'T00:00:00Z') + pos * 864e5)
-  // centre of the native thumb along the track
-  const at = `calc(${THUMB / 2}px + (100% - ${THUMB}px) * ${p / 100})`
-  // month ticks
-  const ticks: { at: number; label: string }[] = []
-  for (let d = 0; d < days; d++) {
-    const iso = isoAt(start, d)
-    if (iso.endsWith('-01')) ticks.push({ at: (d / (days - 1)) * 100, label: MONTHS[+iso.slice(5, 7) - 1] })
-  }
+  const seconds = useSeconds()
+  const ready = useTimeReady()
   return (
-    <div className="tl-wrap relative min-w-0 flex-1">
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-line-2">
-        <div className="h-full rounded-full bg-gradient-to-r from-ice/10 via-ice/40 to-ice shadow-[0_0_12px_oklch(0.86_0.1_210/0.5)]" style={{ width: at }} />
+    <div className="min-w-0 flex-1">
+      <div className="flex justify-between font-mono text-[10px] text-ink-3">
+        <span>Heart-rate time</span>
+        <input type="time" step={1} value={clock(seconds)} disabled={!ready} aria-label="Exact heart-rate time"
+          onChange={e => { if (!e.target.value) return; const [h, m, s = 0] = e.target.value.split(':').map(Number); replay.seekSeconds(h * 3600 + m * 60 + s) }}
+          onInput={e => { if (!e.currentTarget.value) return; const [h, m, s = 0] = e.currentTarget.value.split(':').map(Number); replay.seekSeconds(h * 3600 + m * 60 + s) }}
+          className="w-[100px] bg-transparent text-right text-ink" />
       </div>
-      {ticks.map((t) => (
-        <span key={t.at} className="pointer-events-none absolute top-[calc(50%+9px)] -translate-x-1/2 font-mono text-[9.5px] uppercase tracking-wider text-ink-3" style={{ left: `${t.at}%` }}>
-          {t.label}
-        </span>
-      ))}
-      <div className="moon pointer-events-none absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_8px_oklch(0.92_0.06_210/0.55)]" style={{ left: at }}>
-        <Moon phase={phase} />
-      </div>
-      <input
-        type="range"
-        className="tl relative"
-        min={0}
-        max={days - 1}
-        step={1}
-        value={Math.round(pos)}
-        onChange={(e) => replay.seek(+e.target.value)}
-        aria-label="Replay date"
-        aria-valuetext={`${isoAt(start, Math.round(pos))} · ${phaseName(phase)}`}
-        title={phaseName(phase)}
-      />
+      <input type="range" min={0} max={86399} step={1} value={seconds}
+        disabled={!ready} onChange={e => replay.seekSeconds(+e.target.value)}
+        aria-label="Heart-rate time" aria-valuetext={clock(seconds)} className="w-full accent-cyan-300" />
     </div>
   )
 }
@@ -135,16 +115,18 @@ export function SpeedCycle() {
   const i = SPEEDS.findIndex((s) => s.id === speed)
   return (
     <button onClick={() => replay.setSpeed(SPEEDS[(i + 1) % SPEEDS.length].id)} className="h-9 shrink-0 rounded-full border border-line px-3 font-mono text-[11px] text-ink-2" aria-label="Change replay speed">
-      {SPEEDS[i]?.label ?? '1 d / s'}
+      {SPEEDS[i]?.label ?? '1x'}
     </button>
   )
 }
 
 export function ReplayBar() {
+  const live = useLive(), seconds = useSeconds(), playing = usePlaying()
+  if (live) return <div role="status" className="glass flex items-center justify-center gap-3 rounded-full px-5 py-4 font-mono text-xs text-ice"><span className="size-2 rounded-full bg-ice animate-pulse" />{playing ? 'LIVE SIMULATION' : 'SIMULATION COMPLETE'} · {clock(seconds)} · 1x · polling every 5s</div>
   return (
     <div className="glass flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 sm:gap-3">
       <PlayButton />
-      <div className="hidden items-center sm:flex">
+      <div className="flex items-center">
         <IconBtn onClick={replay.restart} label="Restart replay">
           <RotateCcw className="size-4" />
         </IconBtn>
@@ -174,7 +156,7 @@ export function MissionDate() {
   const iso = isoAt(start, day)
   const d = new Date(iso + 'T00:00:00Z')
   return (
-    <div className="text-right leading-none">
+    <DatePicker><div className="text-right leading-none">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
         Replay · day {String(day + 1).padStart(3, '0')}
         <span className="hidden sm:inline"> · {phaseName(moonPhase(d.getTime()))}</span>
@@ -182,6 +164,23 @@ export function MissionDate() {
       <p className="mt-1.5 font-display text-xl font-medium tabular tracking-tight sm:text-2xl">
         {d.getUTCDate()} {MONTHS[d.getUTCMonth()]} <span className="text-ink-3">{d.getUTCFullYear()}</span>
       </p>
-    </div>
+    </div></DatePicker>
   )
+}
+
+export function LiveSimulationButton() {
+  const live = useLive(), total = useTotalDays()
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const toggle = async () => {
+    setBusy(true); setError('')
+    try {
+      if (live) { replay.stopLive(); await stopSimulation(live) }
+      else replay.startLive(await startSimulation())
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+  return <div className="relative">
+    <button disabled={busy || total <= 3} onClick={toggle} className="max-w-[140px] rounded-full border border-ice/40 bg-ice/10 px-3 py-2 text-xs text-ice disabled:opacity-40">{busy ? 'Connecting…' : live ? 'Stop live simulation' : 'Start live simulation'}</button>
+    {error && <div role="alert" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-line bg-panel-solid p-3 text-xs text-ink">{error}<button aria-label="Dismiss simulation error" onClick={() => setError('')} className="ml-2">×</button></div>}
+  </div>
 }

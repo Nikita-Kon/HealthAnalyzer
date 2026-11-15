@@ -24,14 +24,14 @@ export function BodyStage({ analytics, bpm }: { analytics?: Analytics; bpm: numb
   const labels = useRef(new Map<Organ, HTMLElement>())
 
   return (
-    <div className="relative h-[min(54svh,560px)] min-h-[360px] w-full overflow-hidden sm:h-[min(66svh,700px)]">
+    <div className="relative h-[360px] min-h-[360px] w-full shrink-0 overflow-hidden">
       {/* scanner frame */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(48%_52%_at_50%_48%,oklch(0.32_0.07_215/0.35),transparent_72%)]" />
       {LITE ? (
         <div className="grid h-full place-items-center font-mono text-[11px] uppercase tracking-[0.3em] text-ink-3">3D view off</div>
       ) : (
         <Suspense fallback={<div className="grid h-full place-items-center font-mono text-[11px] uppercase tracking-[0.3em] text-ink-3">Calibrating scan…</div>}>
-          <BodyScene organs={organs} selected={selected} bpm={bpm ?? 60} labels={labels} />
+          <BodyScene organs={organs} selected={selected} bpm={bpm} labels={labels} />
         </Suspense>
       )}
 
@@ -60,7 +60,7 @@ export function BodyStage({ analytics, bpm }: { analytics?: Analytics; bpm: numb
                 <span className="absolute left-0 top-1/2 h-px w-6 group-data-[side=l]:left-auto group-data-[side=l]:right-0" style={{ background: `linear-gradient(90deg, ${c}, transparent)` }} />
                 <span className="st rounded-full border px-3 py-1 text-[11.5px] backdrop-blur-md" style={{ color: c, borderColor: `color-mix(in oklab, ${c} 45%, transparent)`, background: 'oklch(0.14 0.014 255 / 0.72)' }}>
                   <span className="font-medium">{o.title}</span>
-                  <span className="ml-1.5 hidden text-ink-3 sm:inline">{o.system}</span>
+
                 </span>
               </button>
             </div>
@@ -71,8 +71,8 @@ export function BodyStage({ analytics, bpm }: { analytics?: Analytics; bpm: numb
       {/* HUD */}
       <div className="pointer-events-none absolute left-4 top-4 sm:left-5 sm:top-5">
         <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-          <HeartPulse className="size-3.5 text-alert/80" style={{ animation: `breathe ${60 / (bpm ?? 60)}s ease-in-out infinite` }} aria-hidden />
-          {bpm ?? '—'} bpm rest
+          <HeartPulse className="size-3.5 text-alert/80" style={{ animation: bpm == null ? 'none' : `breathe ${60 / bpm}s ease-in-out infinite` }} aria-hidden />
+          {bpm ?? '—'} bpm
         </p>
       </div>
       <p className="pointer-events-none absolute right-4 top-4 hidden items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3 sm:flex">
@@ -90,7 +90,7 @@ export function BodyStage({ analytics, bpm }: { analytics?: Analytics; bpm: numb
               onClick={() => setSelected(selected === o.organ ? null : o.organ)}
               aria-pressed={selected === o.organ}
               title={o.detail}
-              className={`st flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] backdrop-blur-md ${selected === o.organ ? 'border-line-2 bg-raise/90 text-ink' : 'border-line bg-void/50 text-ink-2 hover:text-ink'}`}
+              className={`st flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1.5 text-[10px] backdrop-blur-md ${selected === o.organ ? 'border-line-2 bg-raise/90 text-ink' : 'border-line bg-void/50 text-ink-2 hover:text-ink'}`}
             >
               <Icon className="st size-3.5" style={{ color: s.color }} aria-hidden />
               {o.title}

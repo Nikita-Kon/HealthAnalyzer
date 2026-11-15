@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import models  # noqa: F401  (registers every table on Base.metadata)
 from app.database import Base, engine
-from app.routers import astronauts, measurements, analytics
+from app.routers import astronauts, measurements, analytics, simulation
 
 # Built dashboard (cd frontend && npm run build). Served from the same domain as the API, so no CORS is needed.
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
@@ -19,6 +19,7 @@ app = FastAPI(title="AstroHealth API")
 app.include_router(astronauts.router, prefix="/api/v1")
 app.include_router(measurements.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(simulation.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

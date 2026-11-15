@@ -4,17 +4,19 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ServerCrash } from 'lucide-react'
 import { api, USING_MOCK } from '@/api/client'
 import type { MetricId } from '@/api/types'
-import { useAnalytics, useAstronauts, useCrewAnalytics, useCrewMetric, useHistory, useSteps, useSummary, useThrottled } from '@/hooks/useHealthData'
-import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart } from '@/hooks/useReplay'
+import { useAnalytics, useAstronauts, useCrewAnalytics, useHistory, useSteps, useSummary, useThrottled } from '@/hooks/useHealthData'
+import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart, useLive } from '@/hooks/useReplay'
 import { crewStatus, isAnomaly } from '@/lib/status'
 import { TEAM, crewMember } from '@/lib/crew'
 import { Brand } from '@/components/Brand'
 import { CrewRail, CrewStrip } from '@/components/Crew'
+import { useHeartRate } from '@/hooks/useHeartRate'
+import { IntradayHeartRate } from '@/components/IntradayHeartRate'
 import { BodyStage } from '@/components/body/BodyStage'
 import { Vitals } from '@/components/Vitals'
 import { Activity } from '@/components/Activity'
 import { Notifications } from '@/components/Notifications'
-import { MissionDate, ReplayBar } from '@/components/Replay'
+import { MissionDate, ReplayBar, LiveSimulationButton } from '@/components/Replay'
 import { Card, Kicker, StatusPill } from '@/components/ui'
 
 const HistoryChart = lazy(() => import('@/components/HistoryChart').then((m) => ({ default: m.HistoryChart })))
@@ -55,20 +57,21 @@ export default function Dashboard() {
     if (range) replay.init(range.start, range.days, replay.get().days > 1 ? undefined : Math.min(DEMO_START_DAY, range.days - 1))
   }, [range])
 
+  const live = useLive()
   const speed = useSpeed()
   const asOf = useAsOf()
   const day = useDay()
   const start = useStart()
   const days = useReplayRange()
-  const asOfSel = useThrottled(asOf, speed >= 4 ? 140 : 0)
-  const asOfCrew = useThrottled(asOf, speed >= 4 ? 450 : speed >= 1 ? 120 : 0)
+  const asOfSel = useThrottled(live ? isoAt(start, Math.max(0, day - 1)) : asOf, speed >= 4 ? 140 : 0)
+  const asOfCrew = useThrottled(live ? isoAt(start, Math.max(0, day - 1)) : asOf, speed >= 4 ? 450 : speed >= 1 ? 120 : 0)
 
+  const heart = useHeartRate(sel, asOf)
   const history = useHistory(sel || null)
   const analytics = useAnalytics(sel || null, asOfSel).data
   const summary = useSummary(sel || null, asOfSel).data
   const steps = useSteps(sel || null).data
   const crewA = useCrewAnalytics(ids, asOfCrew)
-  const rhr = useCrewMetric(ids, 'resting_heart_rate')
   const [metric, setMetric] = useState<MetricId>('resting_heart_rate')
 
   const me = sel ? crewMember(sel) : null
@@ -90,19 +93,19 @@ export default function Dashboard() {
       </div>
     )
 
-  const crewProps = { crew, analytics: crewA, rhr, asOf: asOfCrew, selected: sel, onSelect: select }
+  const crewProps = { crew, analytics: crewA, selected: sel, onSelect: select }
 
   return (
     <div className="min-h-dvh pb-28 lg:pb-10">
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-line bg-void/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1680px] items-center gap-4 px-4 py-3 sm:px-6 lg:gap-6">
+        <div className="mx-auto flex max-w-[1680px] items-center gap-4 px-4 py-3 max-sm:flex-wrap max-sm:gap-y-2 sm:px-6 lg:gap-6">
           <Brand />
           <div className="hidden min-w-0 flex-1 lg:block">
             <ReplayBar />
           </div>
-          <div className="ml-auto lg:ml-0">
-            <MissionDate />
+          <div className="ml-auto max-sm:w-full lg:ml-0">
+            <div className="flex items-center gap-3 max-sm:justify-between"><LiveSimulationButton /><MissionDate /></div>
           </div>
         </div>
       </header>
@@ -112,9 +115,9 @@ export default function Dashboard() {
         <ReplayBar />
       </div>
 
-      <main className="mx-auto grid max-w-[1680px] grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-4 sm:px-6 lg:grid-cols-[256px_minmax(0,1fr)_330px] xl:grid-cols-[288px_minmax(0,1fr)_360px] lg:gap-5 lg:pt-5">
+      <main className="mx-auto grid max-w-[1680px] grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-4 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)_320px] xl:grid-cols-[232px_minmax(0,1fr)_340px] lg:gap-5 lg:pt-5">
         {/* crew rail */}
-        <aside className="hidden lg:sticky lg:top-[84px] lg:col-start-1 lg:row-span-4 lg:row-start-1 lg:flex lg:h-[calc(100dvh-104px)] lg:self-start">
+        <aside className="hidden lg:sticky lg:top-[84px] lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:flex lg:max-h-[calc(100dvh-104px)] lg:self-start">
           <Card className="flex w-full flex-col p-2 pt-4">
             <CrewRail {...crewProps} />
           </Card>
@@ -124,8 +127,10 @@ export default function Dashboard() {
           <CrewStrip {...crewProps} />
         </div>
 
+        {/* Keep the profile and vitals together so sidebar content cannot stretch the profile. */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:gap-5">
         {/* crew member */}
-        <Card delay={0.05} className="lg:col-start-2 lg:row-start-1">
+        <Card delay={0.05} className="shrink-0">
           <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-5 py-5 sm:flex-nowrap sm:px-6">
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
@@ -163,51 +168,50 @@ export default function Dashboard() {
         </Card>
 
         {/* vitals */}
-        <section className="lg:col-start-2 lg:row-start-2" aria-label="Current measurements">
+        <section className="min-w-0" aria-label="Current measurements">
           <Vitals summary={summary} analytics={analytics} history={history.data} asOf={asOfSel} active={metric} onPick={pick} />
         </section>
 
+        </div>
+
+        <Card className="p-4 sm:p-6 lg:col-start-2 lg:row-start-2">
+          <IntradayHeartRate heart={heart} />
+        </Card>
+
         {/* history */}
-        <Card delay={0.12} className="scroll-mt-24 p-4 sm:p-6 lg:col-start-2 lg:row-start-3">
+        <Card delay={0.12} className="scroll-mt-24 p-4 sm:p-6 lg:col-start-2 lg:col-span-2 lg:row-start-3">
           <div id="history" className="scroll-mt-28" />
           <Suspense fallback={<div className="h-[320px]" />}>
-            <HistoryChart history={history.data} analytics={analytics} metric={metric} onMetric={setMetric} start={start} day={day} days={days} member={sel} />
+            <HistoryChart loading={history.loading} error={history.error} history={history.data} analytics={analytics} metric={metric} onMetric={setMetric} start={start} day={day} days={days} member={sel} />
           </Suspense>
         </Card>
 
         {/* alerts */}
-        <aside className="lg:sticky lg:top-[84px] lg:col-start-3 lg:row-span-4 lg:row-start-1 lg:max-h-[calc(100dvh-104px)] lg:self-start lg:overflow-y-auto lg:no-scrollbar">
-          <Card delay={0.08} className="p-4 sm:p-5">
-            <div className="mb-4 flex items-end justify-between">
+        <aside className="min-h-0 lg:relative lg:col-start-3 lg:row-start-1 lg:self-stretch">
+          <Card delay={0.08} className="flex min-h-0 flex-col overflow-hidden p-4 sm:p-5 lg:absolute lg:inset-0">
+            <div className="mb-4 flex shrink-0 items-end justify-between">
               <div>
                 <Kicker>Notifications</Kicker>
                 <h2 className="mt-1 font-display text-lg font-medium">Alerts & explanations</h2>
               </div>
               <span className="font-mono text-xs text-ink-3 tabular">{nChanges + (analytics?.combined_findings.length ?? 0)}</span>
             </div>
-            <Notifications analytics={analytics} onPick={pick} />
-          </Card>
-          <Card delay={0.16} className="mt-4 hidden p-5 lg:block">
-            <Kicker>How detection works</Kicker>
-            <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-ink-2">
-              <li><span className="text-ink">Personal baseline</span> — median of the previous 14 days, needs ≥ 7 valid observations.</li>
-              <li><span className="text-ink">Statistical change</span> — robust z-score (median + MAD) beyond the threshold.</li>
-              <li><span className="text-ink">Combined change</span> — two related metrics change in the same 3-day window.</li>
-              <li><span className="text-ink">No future leak</span> — only data up to the replay date is analysed and drawn.</li>
-            </ul>
+            <div role="region" aria-label="Alerts list" tabIndex={0} className="min-h-0 max-h-[360px] flex-1 overflow-y-auto overscroll-contain pr-1 lg:max-h-none">
+              <Notifications analytics={analytics} onPick={pick} />
+            </div>
           </Card>
         </aside>
 
         {/* 3D body map */}
-        <Card delay={0.2} className="overflow-hidden lg:col-start-2 lg:row-start-4">
-          <div className="relative z-10 flex items-end justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
+        <Card delay={0.2} className="flex flex-col overflow-hidden lg:col-start-3 lg:row-start-2">
+          <div className="relative z-10 flex items-end justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
             <div>
               <Kicker>Body map · {me?.code ?? '—'}</Kicker>
               <h2 className="mt-1 font-display text-lg font-medium">3D health scan</h2>
             </div>
             <StatusPill status={st} />
           </div>
-          <BodyStage analytics={analytics} bpm={summary?.metrics.resting_heart_rate?.value ?? null} />
+          <BodyStage analytics={analytics} bpm={heart.current?.bpm ?? null} />
         </Card>
       </main>
 
