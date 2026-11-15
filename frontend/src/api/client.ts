@@ -1,9 +1,10 @@
 // API client for the HealthAnalyzer backend (FastAPI, /api/v1) with a drop-in mock.
-// VITE_API_URL: "mock" (default) → built-in mock; "/api/v1" → backend through the Vite dev proxy; or a full URL.
+// VITE_API_URL: "mock" → built-in mock; "/api/v1" → backend through the Vite dev proxy; or a full URL.
+// Default: mock in dev and in the single-file demo, the same-domain API in a production build (served by FastAPI).
 import type { ActivityId, Analytics, Astronaut, AstronautListItem, MeasurementPage, MetricId, MetricInfo, Summary } from './types'
 import { mockApi } from './mock'
 
-const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? 'mock').replace(/\/$/, '')
+const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? (import.meta.env.MODE === 'production' ? '/api/v1' : 'mock')).replace(/\/$/, '')
 export const USING_MOCK = BASE === 'mock' || BASE === ''
 
 export class ApiError extends Error {
