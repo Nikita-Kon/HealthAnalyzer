@@ -94,7 +94,7 @@ export function CrewRail({ crew, analytics, rhr, asOf, selected, onSelect }: Pro
                         <span className="font-mono text-[9.5px] text-ink-3">{m.role.code}</span>
                       </span>
                       <span className="st mt-0.5 block font-mono text-[10px] uppercase tracking-wider" style={{ color: n ? STATUS[st].color : 'var(--color-ink-3)' }}>
-                        {st === 'unknown' ? 'not enough data' : n ? `${n} change${n > 1 ? 's' : ''}${a?.combined_findings.length ? ' · combined' : ''}` : 'within baseline'}
+                        {!a ? 'syncing…' : st === 'unknown' ? 'not enough data' : n ? `${n} change${n > 1 ? 's' : ''}${a?.combined_findings.length ? ' · combined' : ''}` : 'within baseline'}
                       </span>
                     </span>
                     <Sparkline values={last(rhr[c.id] ?? [], asOf, 21)} color={st === 'nominal' || st === 'unknown' ? 'var(--color-ink-3)' : STATUS[st].color} width={58} height={20} />

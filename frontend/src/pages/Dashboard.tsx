@@ -132,7 +132,7 @@ export default function Dashboard() {
               <Kicker>
                 {me?.code ?? '—'} · {me?.role.label ?? ''} · as of {asOfSel}
               </Kicker>
-                <span className="sm:hidden"><StatusPill status={st} /></span>
+                <span className="sm:hidden"><StatusPill status={st}>{analytics ? undefined : 'Syncing'}</StatusPill></span>
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.h1
@@ -147,7 +147,9 @@ export default function Dashboard() {
                 </motion.h1>
               </AnimatePresence>
               <p className="st mt-2 text-[13px] text-ink-2 sm:text-sm">
-                {st === 'unknown'
+                {!analytics
+                  ? 'Syncing with mission data…'
+                  : st === 'unknown'
                   ? 'Collecting enough days for a personal baseline.'
                   : st === 'nominal'
                     ? 'All tracked metrics are within the personal baseline.'
@@ -156,7 +158,7 @@ export default function Dashboard() {
             </div>
             <div className="hidden h-[104px] w-px shrink-0 self-center bg-line sm:block" />
             <Activity data={steps?.data} asOf={asOfSel} />
-            <span className="hidden shrink-0 sm:block"><StatusPill status={st} /></span>
+            <span className="hidden shrink-0 sm:block"><StatusPill status={st}>{analytics ? undefined : 'Syncing'}</StatusPill></span>
           </div>
         </Card>
 

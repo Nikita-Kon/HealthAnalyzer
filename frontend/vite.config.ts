@@ -15,8 +15,9 @@ export default defineConfig(({ mode }) => ({
   ],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: {
-    // FastAPI serves /api/v1 on :8000 — proxy it in dev so VITE_API_URL=/api/v1 just works
-    proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } },
+    // FastAPI serves /api/v1 on :8000 — proxy it in dev so VITE_API_URL=/api/v1 just works.
+    // API_PROXY points the proxy at a deployed backend instead (it has no CORS), e.g. API_PROXY=https://demo.nikitak.dev
+    proxy: { '/api': { target: process.env.API_PROXY ?? 'http://localhost:8000', changeOrigin: true, secure: true } },
   },
   build: mode === 'single' ? { outDir: 'dist-single' } : undefined,
 }))

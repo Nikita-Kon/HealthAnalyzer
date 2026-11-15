@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, fetchHistory } from '@/api/client'
-import type { MetricId } from '@/api/types'
+import type { Analytics, MetricId } from '@/api/types'
 import { METRICS } from '@/lib/metrics'
 
 export type History = Partial<Record<MetricId, { date: string; value: number }[]>>
@@ -57,10 +57,18 @@ export const useSummary = (id: string | null, asOf: string) =>
   useQuery({ queryKey: ['summary', id, asOf], queryFn: () => api.summary(id!, asOf), enabled: !!id, placeholderData: keepPreviousData, staleTime: Infinity })
 
 export function useCrewAnalytics(ids: string[], asOf: string) {
+  const client = useQueryClient()
+  // keepPreviousData doesn't carry over inside useQueries — fall back to the closest cached day so the rail never blanks during replay
+  const closest = (id: string) => {
+    let best: Analytics | undefined
+    for (const [, a] of client.getQueriesData<Analytics>({ queryKey: ['analytics', id] }))
+      if (a && (!best || Math.abs(Date.parse(a.as_of) - Date.parse(asOf)) < Math.abs(Date.parse(best.as_of) - Date.parse(asOf)))) best = a
+    return best
+  }
   const qs = useQueries({
-    queries: ids.map((id) => ({ queryKey: ['analytics', id, asOf], queryFn: () => api.analytics(id, asOf), placeholderData: keepPreviousData, staleTime: Infinity })),
+    queries: ids.map((id) => ({ queryKey: ['analytics', id, asOf], queryFn: () => api.analytics(id, asOf), placeholderData: () => closest(id), staleTime: Infinity })),
   })
-  const key = qs.map((q) => q.dataUpdatedAt).join()
+  const key = qs.map((q) => `${q.data?.as_of}:${q.dataUpdatedAt}`).join()
   return useMemo(() => Object.fromEntries(ids.map((id, i) => [id, qs[i].data])), [key]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
