@@ -8,8 +8,9 @@ notifications with explanations and "not enough data" states — plus a 3D body 
 ```bash
 cd frontend
 npm install            # .npmrc has legacy-peer-deps=true
-npm run dev            # http://localhost:5173 — mock data by default
+npm run dev            # http://localhost:5000 — real API via the proxy by default
 ```
+For mock data without a backend, set `VITE_API_URL=mock` in `frontend/.env`.
 
 ## Connect the backend
 ```bash

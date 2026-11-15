@@ -115,16 +115,22 @@ If the database is empty the API still starts: `/api/v1/astronauts` returns an e
 ```bash
 cd frontend
 npm install
-npm run dev        # mock data, no backend needed
+npm run dev        # http://localhost:5000, proxies /api to FastAPI on :8000
 npm run build      # production build in frontend/dist
 ```
 
-Once `frontend/dist` exists, FastAPI serves the dashboard at http://localhost:8000/ and it uses the real API on the same domain.
+- `npm run dev` uses the real API by default, so start `uvicorn` (step 4) first.
+- **macOS:** port 5000 is taken by AirPlay Receiver ("Port 5000 is already in use"). Either run `npm run dev -- --port 5173`, or turn off System Settings → General → AirDrop & Handoff → AirPlay Receiver.
+- To work on the UI without a backend, create `frontend/.env` with `VITE_API_URL=mock`. See `frontend/.env.example`.
+- Once `frontend/dist` exists, FastAPI also serves the dashboard at http://localhost:8000/ and it uses the API on the same domain.
+- Live simulation (`/api/v1/simulation`) needs at least four days of imported data, including `heart_rate.json` samples.
+
+More frontend details: [`frontend/README.md`](frontend/README.md).
 
 ## 6. Tests
 
 ```bash
 cd backend
-python -m pip install pytest
+python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
