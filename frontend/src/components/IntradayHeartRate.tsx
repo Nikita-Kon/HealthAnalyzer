@@ -4,7 +4,7 @@ import { Kicker } from './ui'
 
 type HeartRate = ReturnType<typeof useHeartRate>
 export function IntradayHeartRate({ heart }: { heart: HeartRate }) {
-  const { current, samples, seconds, isPending, isError } = heart
+  const { current, samples, seconds, isPending, isError, error, live } = heart
   const from = Math.max(0, seconds - 900)
   const window = samples.filter(s => s.second >= from && s.second <= seconds)
   const low = Math.min(40, ...window.map(s => s.bpm)) - 5
@@ -26,7 +26,7 @@ export function IntradayHeartRate({ heart }: { heart: HeartRate }) {
         <p className="font-display text-3xl tabular">{current?.bpm ?? '—'} <span className="text-xs text-ink-3">bpm</span></p>
       </div>
       <p className="mt-2 text-xs text-ink-3" aria-live="polite">
-        {isPending ? 'Loading samples…' : isError ? 'Could not load heart-rate samples.' : !samples.length ? 'No heart-rate samples for this participant and day.' : current ? `Recorded ${current.recorded_at.slice(11, 19)} · confidence ${current.confidence ?? 'unknown'}` : 'No recent sample at this time (gap over 60 seconds).'}
+        {isPending ? 'Loading samples…' : isError ? (error?.message ?? 'Could not load heart-rate samples.') : !samples.length ? (live ? 'Waiting for new recorded samples…' : 'No heart-rate samples for this participant and day.') : current ? `Recorded ${current.recorded_at.slice(11, 19)} · confidence ${current.confidence ?? 'unknown'}` : 'No recent sample at this time (gap over 60 seconds).'}
       </p>
       <svg viewBox="0 0 600 220" className="mt-4 h-[250px] w-full" role="img" aria-label="Recorded heart rate during the last 15 minutes; gaps are not interpolated">
         {[low, Math.round((high + low) / 2), high].map(v => <g key={v}><line x1="12" x2="588" y1={y(v)} y2={y(v)} stroke="currentColor" opacity="0.1" /><text x="14" y={y(v) - 3} fill="currentColor" fontSize="10" opacity="0.5">{v}</text></g>)}

@@ -1,6 +1,8 @@
 import { Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
-import { SPEEDS, isoAt, replay, useDay, usePlaying,  useSpeed, useStart, useSeconds, useTimeReady, clock } from '@/hooks/useReplay'
-import { useId } from 'react'
+import { SPEEDS, isoAt, replay, useDay, usePlaying,  useSpeed, useStart, useSeconds, useTimeReady, clock, useLive, useTotalDays } from '@/hooks/useReplay'
+import { startSimulation, stopSimulation } from '@/api/client'
+import { DatePicker } from './DatePicker'
+import { useId, useState } from 'react'
 import { Segmented } from './ui'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -119,6 +121,8 @@ export function SpeedCycle() {
 }
 
 export function ReplayBar() {
+  const live = useLive(), seconds = useSeconds(), playing = usePlaying()
+  if (live) return <div role="status" className="glass flex items-center justify-center gap-3 rounded-full px-5 py-4 font-mono text-xs text-ice"><span className="size-2 rounded-full bg-ice animate-pulse" />{playing ? 'LIVE SIMULATION' : 'SIMULATION COMPLETE'} · {clock(seconds)} · 1x · polling every 5s</div>
   return (
     <div className="glass flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 sm:gap-3">
       <PlayButton />
@@ -152,7 +156,7 @@ export function MissionDate() {
   const iso = isoAt(start, day)
   const d = new Date(iso + 'T00:00:00Z')
   return (
-    <div className="text-right leading-none">
+    <DatePicker><div className="text-right leading-none">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
         Replay · day {String(day + 1).padStart(3, '0')}
         <span className="hidden sm:inline"> · {phaseName(moonPhase(d.getTime()))}</span>
@@ -160,6 +164,23 @@ export function MissionDate() {
       <p className="mt-1.5 font-display text-xl font-medium tabular tracking-tight sm:text-2xl">
         {d.getUTCDate()} {MONTHS[d.getUTCMonth()]} <span className="text-ink-3">{d.getUTCFullYear()}</span>
       </p>
-    </div>
+    </div></DatePicker>
   )
+}
+
+export function LiveSimulationButton() {
+  const live = useLive(), total = useTotalDays()
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const toggle = async () => {
+    setBusy(true); setError('')
+    try {
+      if (live) { replay.stopLive(); await stopSimulation(live) }
+      else replay.startLive(await startSimulation())
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+  return <div className="relative">
+    <button disabled={busy || total <= 3} onClick={toggle} className="max-w-[140px] rounded-full border border-ice/40 bg-ice/10 px-3 py-2 text-xs text-ice disabled:opacity-40">{busy ? 'Connecting…' : live ? 'Stop live simulation' : 'Start live simulation'}</button>
+    {error && <div role="alert" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-line bg-panel-solid p-3 text-xs text-ink">{error}<button aria-label="Dismiss simulation error" onClick={() => setError('')} className="ml-2">×</button></div>}
+  </div>
 }

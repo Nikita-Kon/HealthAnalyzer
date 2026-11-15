@@ -370,13 +370,12 @@ def getRecordDateRange(astronaut_id):
     days = []
 
     with SessionLocal() as db:
-        for at in (DailyMeasurement.day, WellnessReport.effective_time_frame, SleepScore.timestamp, TrainingSession.end_date_time):
-            first, last = db.execute(
-                select(func.min(func.date(at)), func.max(func.date(at)))
-                .where(at.class_.astronaut_id == astronaut_id)
-            ).one()
+        for at in (DailyMeasurement.day, HeartRateSample.recorded_at, WellnessReport.effective_time_frame, SleepScore.timestamp, TrainingSession.end_date_time):
+            statement = select(at).where(at.class_.astronaut_id == astronaut_id, at.is_not(None))
+            first = db.scalar(statement.order_by(at).limit(1))
+            last = db.scalar(statement.order_by(at.desc()).limit(1))
             if first is not None:
-                days += [str(first), str(last)]
+                days += [first.date().isoformat(), last.date().isoformat()]
 
     if not days:
         return None

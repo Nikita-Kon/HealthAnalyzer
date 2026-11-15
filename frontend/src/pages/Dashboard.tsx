@@ -5,7 +5,7 @@ import { ServerCrash } from 'lucide-react'
 import { api, USING_MOCK } from '@/api/client'
 import type { MetricId } from '@/api/types'
 import { useAnalytics, useAstronauts, useCrewAnalytics, useHistory, useSteps, useSummary, useThrottled } from '@/hooks/useHealthData'
-import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart } from '@/hooks/useReplay'
+import { isoAt, replay, useAsOf, useDay, useReplayRange, useSpeed, useStart, useLive } from '@/hooks/useReplay'
 import { crewStatus, isAnomaly } from '@/lib/status'
 import { TEAM, crewMember } from '@/lib/crew'
 import { Brand } from '@/components/Brand'
@@ -16,7 +16,7 @@ import { BodyStage } from '@/components/body/BodyStage'
 import { Vitals } from '@/components/Vitals'
 import { Activity } from '@/components/Activity'
 import { Notifications } from '@/components/Notifications'
-import { MissionDate, ReplayBar } from '@/components/Replay'
+import { MissionDate, ReplayBar, LiveSimulationButton } from '@/components/Replay'
 import { Card, Kicker, StatusPill } from '@/components/ui'
 
 const HistoryChart = lazy(() => import('@/components/HistoryChart').then((m) => ({ default: m.HistoryChart })))
@@ -57,13 +57,14 @@ export default function Dashboard() {
     if (range) replay.init(range.start, range.days, replay.get().days > 1 ? undefined : Math.min(DEMO_START_DAY, range.days - 1))
   }, [range])
 
+  const live = useLive()
   const speed = useSpeed()
   const asOf = useAsOf()
   const day = useDay()
   const start = useStart()
   const days = useReplayRange()
-  const asOfSel = useThrottled(asOf, speed >= 4 ? 140 : 0)
-  const asOfCrew = useThrottled(asOf, speed >= 4 ? 450 : speed >= 1 ? 120 : 0)
+  const asOfSel = useThrottled(live ? isoAt(start, Math.max(0, day - 1)) : asOf, speed >= 4 ? 140 : 0)
+  const asOfCrew = useThrottled(live ? isoAt(start, Math.max(0, day - 1)) : asOf, speed >= 4 ? 450 : speed >= 1 ? 120 : 0)
 
   const heart = useHeartRate(sel, asOf)
   const history = useHistory(sel || null)
@@ -104,7 +105,7 @@ export default function Dashboard() {
             <ReplayBar />
           </div>
           <div className="ml-auto lg:ml-0">
-            <MissionDate />
+            <div className="flex items-center gap-3"><LiveSimulationButton /><MissionDate /></div>
           </div>
         </div>
       </header>

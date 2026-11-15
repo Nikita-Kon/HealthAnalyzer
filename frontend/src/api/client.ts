@@ -72,3 +72,20 @@ export async function fetchHeartRateDay(id: string, date: string, signal: AbortS
     if (page.length < 10000) return out
   }
 }
+
+export interface SimulationSession { session_id: string; simulated_at: string; ends_at: string }
+export async function startSimulation(): Promise<SimulationSession> {
+  if (USING_MOCK) throw new Error('Live simulation requires the backend database.')
+  const res = await fetch(`${BASE}/simulation/start`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Cannot start simulation (${res.status}). Check that the updated backend is running.`)
+  return res.json()
+}
+export async function stopSimulation(id: string) {
+  await fetch(`${BASE}/simulation/${id}`, { method: 'DELETE' })
+}
+export async function pollSimulation(session: string, id: string, after: string | null, signal: AbortSignal) {
+  const params = new URLSearchParams(after ? { after } : {})
+  const res = await fetch(`${BASE}/simulation/${session}/heart-rate/${encodeURIComponent(id)}?${params}`, { signal })
+  if (!res.ok) throw new Error('Simulation unavailable. Stop and start it again; the server may have restarted.')
+  return res.json() as Promise<{ simulated_at: string; complete: boolean; has_more: boolean; cursor: string; data: HeartRateSample[] }>
+}

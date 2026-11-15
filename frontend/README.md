@@ -63,3 +63,30 @@ tools/            offline pipeline for the 3D body model
   and lowers its resolution on slow GPUs.
 - `npm run build:single` → `dist-single/index.html`, the whole app in one file for quick demos.
 - 3D body: MakeHuman base mesh (CC0); skeleton & organs from Z-Anatomy / BodyParts3D (CC BY-SA 4.0), adapted — keep the footer attribution.
+
+## Live simulation and reserved days
+
+The final three calendar days of the combined dataset are reserved from normal
+replay. In the current dataset these are 29–31 March 2020. Historical day buttons,
+the date picker, and history requests stop on 28 March. Click the displayed date
+to open the custom calendar; reserved dates are disabled.
+
+Start live simulation creates a backend session at midnight on the first reserved
+day. The server uses elapsed monotonic time to release only heart-rate samples
+whose recorded timestamps have arrived. React polls every 5 seconds with an
+incremental cursor and caches a 15-minute chart window. Data never advances
+faster than 1x; seeking and playback speed changes are unavailable in live mode.
+The simulation crosses midnight automatically and finishes after three real days.
+Stop returns to the last historical day. Restarting starts a fresh session.
+
+Daily history, summaries and alerts use completed days during simulation, while
+current BPM, the intraday chart and 3D heartbeat follow newly released samples.
+There is no invented measurement when a participant has no readings. Connection
+errors are shown in the intraday panel and polling retries on its next interval.
+
+Sessions are process-local and are lost on backend restart; stop/start the
+simulation after a restart. This development feature expects a single backend
+worker; shared/persistent sessions would be needed for multi-worker deployment.
+Raw data endpoints remain available for diagnostics; the three-day reservation
+is an application workflow, not an access-control restriction. The backend
+simulation endpoint itself enforces its real-time cutoff.
