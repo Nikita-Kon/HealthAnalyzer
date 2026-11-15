@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Geologica Variable', 'Onest Variable', system-ui, sans-serif;
+  --font-sans: 'Onest Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --color-void: oklch(0.115 0.012 255);
+  --color-panel: oklch(0.165 0.014 255 / 0.66);
+  --color-panel-solid: oklch(0.165 0.014 255);
+  --color-raise: oklch(0.215 0.016 255);
+  --color-line: oklch(1 0 0 / 0.07);
+  --color-line-2: oklch(1 0 0 / 0.13);
+  --color-ink: oklch(0.97 0.005 250);
+  --color-ink-2: oklch(0.8 0.012 250);
+  --color-ink-3: oklch(0.63 0.016 252);
+  --color-ice: oklch(0.86 0.1 210);
+
+  /* chart series — validated on dark (dataviz validator) */
+  --color-s1: #3987e5;
+  --color-s2: #d95926;
+  --color-s3: #199e70;
+  --color-s4: #9085e9;
+
+  /* status — reserved, always paired with an icon + label */
+  --color-nominal: #22b573;
+  --color-watch: #fab219;
+  --color-alert: #e5484d;
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-breathe: breathe 3.2s ease-in-out infinite;
+  @keyframes breathe {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.12); }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(1100px 700px at 50% -10%, oklch(0.3 0.06 230 / 0.35), transparent 65%),
+      radial-gradient(800px 600px at 100% 100%, oklch(0.26 0.05 280 / 0.22), transparent 60%),
+      var(--color-void);
+    background-attachment: fixed;
+  }
+  ::selection { background: oklch(0.86 0.1 210 / 0.3); }
+  :focus-visible { outline: 2px solid var(--color-ice); outline-offset: 2px; border-radius: 8px; }
+  button { cursor: pointer; }
+}
+
+@utility tabular { font-variant-numeric: tabular-nums; }
+@utility glass {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* status-driven colour that eases instead of snapping */
+.st { transition: color 0.9s var(--ease-soft), background-color 0.9s var(--ease-soft), border-color 0.9s var(--ease-soft), box-shadow 0.9s var(--ease-soft), opacity 0.6s var(--ease-soft); }
+
+/* timeline range */
+input[type='range'].tl { appearance: none; background: transparent; height: 32px; cursor: pointer; width: 100%; }
+input[type='range'].tl::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
+input[type='range'].tl::-moz-range-track { height: 4px; background: transparent; }
+/* the visible thumb is the <Moon/> drawn over the input; the native thumb only keeps the hit area */
+input[type='range'].tl::-webkit-slider-thumb { appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%; background: transparent; }
+input[type='range'].tl::-moz-range-thumb { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; }
+.moon { transition: scale 0.5s var(--ease-soft), filter 0.5s var(--ease-soft); }
+.tl-wrap:hover .moon { scale: 1.12; filter: drop-shadow(0 0 10px oklch(0.92 0.06 210 / 0.75)); }
+.tl-wrap:active .moon { scale: 1.22; }
+
+.recharts-cartesian-axis-tick-value { font-family: var(--font-mono); font-size: 10.5px; fill: var(--color-ink-3); }
+.recharts-surface:focus, .recharts-wrapper:focus { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
